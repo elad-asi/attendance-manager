@@ -1,0 +1,759 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    direction: rtl;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif, 'Arial Hebrew', 'David', 'Narkisim';
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 20px;
+    direction: rtl;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+}
+
+header {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    color: white;
+    padding: 30px;
+    text-align: center;
+}
+
+header h1 {
+    font-size: 2.5rem;
+    margin-bottom: 8px;
+}
+
+.subtitle {
+    opacity: 0.8;
+    font-size: 1.1rem;
+}
+
+/* Upload Section */
+.upload-section {
+    padding: 30px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.upload-section h2 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+}
+
+.upload-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px;
+    border: 2px dashed #667eea;
+    border-radius: 12px;
+    background: white;
+    margin-bottom: 20px;
+}
+
+.upload-area input[type="file"] {
+    display: none;
+}
+
+.upload-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px 30px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.upload-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+}
+
+.upload-hint {
+    margin-top: 15px;
+    color: #6c757d;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+/* Google Sheets Area */
+.google-sheets-area {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    border: 2px solid #34a853;
+}
+
+.google-sheets-area h3 {
+    color: #34a853;
+    margin-bottom: 20px;
+}
+
+/* Google Auth Section */
+.google-auth-section {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.btn-google-signin {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: white;
+    border: 2px solid #4285f4;
+    color: #4285f4;
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.btn-google-signin:hover {
+    background: #4285f4;
+    color: white;
+}
+
+.btn-google-signin img {
+    width: 20px;
+    height: 20px;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 15px;
+    background: #e8f5e9;
+    border-radius: 8px;
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+}
+
+.user-info span {
+    flex: 1;
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.btn-signout {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+
+.btn-signout:hover {
+    background: #c82333;
+}
+
+/* Fetch Sheets Button */
+.btn-fetch {
+    background: #4285f4;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background 0.2s;
+}
+
+.btn-fetch:hover:not(:disabled) {
+    background: #3367d6;
+}
+
+.btn-fetch:disabled {
+    background: #adb5bd;
+    cursor: not-allowed;
+}
+
+/* Sheet Select Dropdown */
+.sheet-select {
+    flex: 1;
+    padding: 12px 16px;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    font-size: 1rem;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.sheet-select:focus {
+    outline: none;
+    border-color: #34a853;
+}
+
+.sheets-input-row.two-cols {
+    display: flex;
+    gap: 10px;
+}
+
+.sheets-input-row.two-cols input {
+    flex: 1;
+}
+
+.sheets-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.sheets-input-row {
+    display: flex;
+    gap: 10px;
+}
+
+.sheets-input-row input {
+    flex: 1;
+    padding: 12px 16px;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+}
+
+.sheets-input-row input:focus {
+    outline: none;
+    border-color: #34a853;
+}
+
+.sheets-input-row.three-cols input {
+    flex: 1;
+    min-width: 100px;
+}
+
+.btn-sheets {
+    background: #34a853;
+    color: white;
+    border: none;
+    padding: 14px 28px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    font-weight: 600;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.btn-sheets:hover {
+    background: #2d8f47;
+    transform: translateY(-2px);
+}
+
+.btn-sheets:disabled {
+    background: #adb5bd;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.sheets-status {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 8px;
+    display: none;
+}
+
+.sheets-status.loading {
+    display: block;
+    background: #fff3cd;
+    color: #856404;
+}
+
+.sheets-status.success {
+    display: block;
+    background: #d4edda;
+    color: #155724;
+}
+
+.sheets-status.error {
+    display: block;
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* Divider */
+.divider {
+    display: flex;
+    align-items: center;
+    margin: 20px 0;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #e9ecef;
+}
+
+.divider span {
+    padding: 0 15px;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+/* Controls Section */
+.controls-section {
+    padding: 20px 30px;
+    background: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.date-range {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.date-range label {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.date-range input[type="date"] {
+    padding: 10px 14px;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    font-size: 0.95rem;
+}
+
+.date-range input[type="date"]:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.btn-apply {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.btn-apply:hover {
+    background: #5a6fd6;
+}
+
+.actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-export {
+    background: #17a2b8;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.btn-export:hover {
+    background: #138496;
+}
+
+.btn-clear {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.btn-clear:hover {
+    background: #c82333;
+}
+
+/* Attendance Table */
+.attendance-section {
+    padding: 30px;
+}
+
+.table-container {
+    overflow-x: auto;
+    max-height: 600px;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+}
+
+#attendanceTable {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 800px;
+}
+
+#attendanceTable th,
+#attendanceTable td {
+    padding: 12px 8px;
+    text-align: center;
+    border: 1px solid #e9ecef;
+}
+
+#attendanceTable thead {
+    background: #2c3e50;
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+#attendanceTable thead th {
+    font-weight: 600;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.sticky-col {
+    position: sticky;
+    background: #2c3e50;
+    z-index: 11;
+}
+
+.col-name {
+    right: 0;
+    min-width: 120px;
+}
+
+.col-ma {
+    right: 120px;
+    min-width: 80px;
+}
+
+.col-gdud {
+    right: 200px;
+    min-width: 70px;
+}
+
+.col-pluga {
+    right: 270px;
+    min-width: 70px;
+}
+
+.col-mahlaka {
+    right: 340px;
+    min-width: 60px;
+}
+
+#attendanceTable tbody tr:nth-child(even) {
+    background: #f8f9fa;
+}
+
+#attendanceTable tbody tr:hover {
+    background: #e3f2fd;
+}
+
+#attendanceTable tbody td:first-child,
+#attendanceTable tbody td:nth-child(2),
+#attendanceTable tbody td:nth-child(3),
+#attendanceTable tbody td:nth-child(4),
+#attendanceTable tbody td:nth-child(5) {
+    position: sticky;
+    background: inherit;
+    font-weight: 500;
+    text-align: right;
+    padding-right: 10px;
+}
+
+#attendanceTable tbody td:first-child {
+    right: 0;
+}
+
+#attendanceTable tbody td:nth-child(2) {
+    right: 120px;
+}
+
+#attendanceTable tbody td:nth-child(3) {
+    right: 200px;
+}
+
+#attendanceTable tbody td:nth-child(4) {
+    right: 270px;
+}
+
+#attendanceTable tbody td:nth-child(5) {
+    right: 340px;
+}
+
+/* Attendance Status Cells */
+.attendance-cell {
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 1.1rem;
+    transition: all 0.2s;
+    min-width: 45px;
+}
+
+.attendance-cell:hover {
+    transform: scale(1.1);
+}
+
+/* Present - Green checkmark */
+.attendance-cell.present {
+    background: #d4edda;
+    color: #155724;
+}
+
+/* Absent - Red X */
+.attendance-cell.absent {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* Arriving - Partial (coming this day) */
+.attendance-cell.arriving {
+    background: #cce5ff;
+    color: #004085;
+}
+
+/* Leaving - Partial (leaving this day) */
+.attendance-cell.leaving {
+    background: #fff3cd;
+    color: #856404;
+}
+
+/* Counted - Not present but counted */
+.attendance-cell.counted {
+    background: #e2d5f1;
+    color: #5a3d8a;
+}
+
+/* Unmarked */
+.attendance-cell.unmarked {
+    background: #f8f9fa;
+    color: #adb5bd;
+}
+
+/* Totals Rows */
+.total-row {
+    font-weight: 700;
+    border-top: 3px solid #2c3e50 !important;
+}
+
+.total-row td {
+    background: #f1f3f4 !important;
+}
+
+.total-row:hover td {
+    background: #f1f3f4 !important;
+}
+
+.total-label {
+    text-align: right !important;
+    padding-right: 15px !important;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.total-symbols {
+    font-size: 0.85rem;
+    color: #495057;
+    white-space: nowrap;
+}
+
+.total-cell {
+    font-size: 1rem;
+    color: #2c3e50;
+}
+
+/* Different colors for each total row */
+.total-mission td {
+    background: #d4edda !important;
+}
+
+.total-mission .total-cell {
+    color: #155724;
+}
+
+.total-leave td {
+    background: #fff3cd !important;
+}
+
+.total-leave .total-cell {
+    color: #856404;
+}
+
+.total-counted td {
+    background: #e2d5f1 !important;
+}
+
+.total-counted .total-cell {
+    color: #5a3d8a;
+}
+
+/* Delete Button */
+.delete-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    margin-right: 5px;
+}
+
+.delete-btn:hover {
+    background: #c82333;
+}
+
+/* No Data Message */
+.no-data {
+    text-align: center;
+    padding: 40px;
+    color: #6c757d;
+    font-size: 1.1rem;
+}
+
+/* Legend */
+.legend-section {
+    padding: 20px 30px;
+    background: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+}
+
+.legend-section h3 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+}
+
+.legend {
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95rem;
+    color: #495057;
+}
+
+.status-box {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.status-box.present {
+    background: #d4edda;
+    border: 2px solid #155724;
+}
+
+.status-box.absent {
+    background: #f8d7da;
+    border: 2px solid #721c24;
+}
+
+.status-box.arriving {
+    background: #cce5ff;
+    border: 2px solid #004085;
+}
+
+.status-box.leaving {
+    background: #fff3cd;
+    border: 2px solid #856404;
+}
+
+.status-box.counted {
+    background: #e2d5f1;
+    border: 2px solid #5a3d8a;
+}
+
+.status-box.unmarked {
+    background: #f8f9fa;
+    border: 2px solid #adb5bd;
+}
+
+/* Totals legend boxes */
+.totals-legend {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #e9ecef;
+}
+
+.totals-legend h4 {
+    color: #2c3e50;
+    margin-bottom: 10px;
+    font-size: 0.95rem;
+}
+
+.status-box.total-mission-box {
+    background: #d4edda;
+    border: 2px solid #155724;
+}
+
+.status-box.total-leave-box {
+    background: #fff3cd;
+    border: 2px solid #856404;
+}
+
+.status-box.total-counted-box {
+    background: #e2d5f1;
+    border: 2px solid #5a3d8a;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .controls-section {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .date-range {
+        width: 100%;
+    }
+
+    .actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    header h1 {
+        font-size: 1.8rem;
+    }
+}

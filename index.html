@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מנהל נוכחות</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📋 מנהל נוכחות</h1>
+            <p class="subtitle">מעקב נוכחות צוות</p>
+        </header>
+
+        <section class="upload-section">
+            <h2>טעינת חברי צוות</h2>
+
+            <!-- Google Sheets Import -->
+            <div class="google-sheets-area">
+                <h3>📊 ייבוא מ-Google Sheets</h3>
+
+                <!-- Google Sign In -->
+                <div id="googleAuthSection" class="google-auth-section">
+                    <button id="googleSignInBtn" class="btn-google-signin">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />
+                        התחבר עם Google
+                    </button>
+                    <div id="userInfo" class="user-info" style="display: none;">
+                        <img id="userAvatar" src="" alt="Avatar" class="user-avatar" />
+                        <span id="userName"></span>
+                        <button id="googleSignOutBtn" class="btn-signout">התנתק</button>
+                    </div>
+                </div>
+
+                <div class="sheets-form">
+                    <!-- Step 1: Paste URL -->
+                    <div class="sheets-input-row">
+                        <input type="text" id="sheetsUrl" placeholder="הדבק קישור ל-Google Sheet" />
+                        <button id="fetchSheetsBtn" class="btn-fetch" disabled>טען גיליונות</button>
+                    </div>
+
+                    <!-- Step 2: Select Sheet (dropdown) -->
+                    <div class="sheets-input-row" id="sheetSelectRow" style="display: none;">
+                        <select id="sheetSelect" class="sheet-select">
+                            <option value="">בחר גיליון...</option>
+                        </select>
+                    </div>
+
+                    <!-- Step 3: Enter Gdud and Pluga -->
+                    <div class="sheets-input-row two-cols" id="gdudPlugaRow" style="display: none;">
+                        <input type="text" id="inputGdud" placeholder="גדוד" />
+                        <input type="text" id="inputPluga" placeholder="פלוגה" />
+                    </div>
+
+                    <!-- Step 4: Load Data -->
+                    <button id="loadFromSheets" class="btn-sheets" style="display: none;">טען נתונים מהגיליון</button>
+                </div>
+
+                <p class="upload-hint">
+                    התחבר עם חשבון Google שלך כדי לגשת לגיליונות פרטיים<br>
+                    עמודות נדרשות בגיליון: שם פרטי, שם משפחה, מ.א, מחלקה
+                </p>
+                <div id="sheetsStatus" class="sheets-status"></div>
+            </div>
+
+            <div class="divider">
+                <span>או</span>
+            </div>
+
+            <!-- XLS Upload -->
+            <div class="upload-area">
+                <input type="file" id="xlsUpload" accept=".xls,.xlsx" />
+                <label for="xlsUpload" class="upload-btn">
+                    📁 בחר קובץ XLS/XLSX
+                </label>
+            </div>
+
+        </section>
+
+        <section class="controls-section">
+            <div class="date-range">
+                <label>טווח תאריכים:</label>
+                <input type="date" id="startDate" value="2025-12-21" />
+                <span>עד</span>
+                <input type="date" id="endDate" value="2026-02-01" />
+                <button id="applyDates" class="btn-apply">החל</button>
+            </div>
+            <div class="actions">
+                <button id="exportData" class="btn-export">📥 ייצוא נתונים</button>
+                <button id="clearData" class="btn-clear">🗑️ נקה הכל</button>
+            </div>
+        </section>
+
+        <section class="attendance-section">
+            <div class="table-container">
+                <table id="attendanceTable">
+                    <thead>
+                        <tr id="headerRow">
+                            <th class="sticky-col col-name">שם</th>
+                            <th class="sticky-col col-ma">מ.א</th>
+                            <th class="sticky-col col-gdud">גדוד</th>
+                            <th class="sticky-col col-pluga">פלוגה</th>
+                            <th class="sticky-col col-mahlaka">מחלקה</th>
+                            <!-- Date columns will be added dynamically -->
+                        </tr>
+                    </thead>
+                    <tbody id="attendanceBody">
+                        <!-- Rows will be added dynamically -->
+                    </tbody>
+                </table>
+            </div>
+            <p id="noDataMsg" class="no-data">עדיין לא נוספו חברי צוות. טען מ-Google Sheets או העלה קובץ XLS.</p>
+        </section>
+
+        <section class="legend-section">
+            <h3>מקרא (לחץ על תאים כדי לעבור בין סטטוסים)</h3>
+            <div class="legend">
+                <span class="legend-item"><span class="status-box present"></span> נוכח (✓)</span>
+                <span class="legend-item"><span class="status-box absent"></span> נעדר (✗)</span>
+                <span class="legend-item"><span class="status-box arriving"></span> מגיע (+)</span>
+                <span class="legend-item"><span class="status-box leaving"></span> עוזב (-)</span>
+                <span class="legend-item"><span class="status-box counted"></span> נספר ($)</span>
+                <span class="legend-item"><span class="status-box unmarked"></span> לא סומן</span>
+            </div>
+            <div class="totals-legend">
+                <h4>סיכומים</h4>
+                <div class="legend">
+                    <span class="legend-item"><span class="status-box total-mission-box"></span> זמין למשימה (✓ +)</span>
+                    <span class="legend-item"><span class="status-box total-leave-box"></span> כולל חופשה (✓ + -)</span>
+                    <span class="legend-item"><span class="status-box total-counted-box"></span> סה"כ נספרים (✓ + - $)</span>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="app.js"></script>
+</body>
+</html>

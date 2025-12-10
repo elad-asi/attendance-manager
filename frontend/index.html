@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מנהל נוכחות</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="version-info">
+                <span id="feVersion">FE: 0.0.1</span>
+                <span id="beVersion">BE: Loading...</span>
+            </div>
+            <div class="current-date-display">
+                <span id="currentDate"></span>
+            </div>
+            <h1>📋 מנהל נוכחות</h1>
+            <p class="subtitle">מעקב נוכחות צוות</p>
+        </header>
+
+        <section class="upload-section">
+            <div class="section-header" onclick="toggleUploadSection()">
+                <h2>טעינת חברי צוות</h2>
+                <span class="toggle-icon">▼</span>
+            </div>
+            <div class="upload-content">
+
+            <!-- Google Sheets Import -->
+            <div class="google-sheets-area">
+                <h3>📊 ייבוא מ-Google Sheets</h3>
+
+                <!-- Google Sign In -->
+                <div id="googleAuthSection" class="google-auth-section">
+                    <button id="googleSignInBtn" class="btn-google-signin">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+                        התחבר עם Google
+                    </button>
+                    <div id="userInfo" class="user-info" style="display: none;">
+                        <img id="userAvatar" src="" alt="Avatar" class="user-avatar" />
+                        <span id="userName"></span>
+                        <button id="googleSignOutBtn" class="btn-signout">התנתק</button>
+                    </div>
+                </div>
+
+                <div class="sheets-form">
+                    <!-- Step 1: Paste URL -->
+                    <div class="sheets-input-row">
+                        <input type="text" id="sheetsUrl" placeholder="הדבק קישור ל-Google Sheet" />
+                        <button id="fetchSheetsBtn" class="btn-fetch" disabled>טען גיליונות</button>
+                    </div>
+
+                    <!-- Step 2: Select Sheet (dropdown) -->
+                    <div class="sheets-input-row" id="sheetSelectRow" style="display: none;">
+                        <select id="sheetSelect" class="sheet-select">
+                            <option value="">בחר גיליון...</option>
+                        </select>
+                    </div>
+
+                    <!-- Step 3: Enter Gdud and Pluga -->
+                    <div class="sheets-input-row two-cols" id="gdudPlugaRow" style="display: none;">
+                        <input type="text" id="inputGdud" placeholder="גדוד" />
+                        <input type="text" id="inputPluga" placeholder="פלוגה" />
+                    </div>
+
+                    <!-- Step 4: Load Data -->
+                    <button id="loadFromSheets" class="btn-sheets" style="display: none;">טען נתונים מהגיליון</button>
+                </div>
+
+                <p class="upload-hint">
+                    התחבר עם חשבון Google שלך כדי לגשת לגיליונות פרטיים<br>
+                    עמודות נדרשות בגיליון: שם פרטי, שם משפחה, מ.א, מחלקה
+                </p>
+                <div id="sheetsStatus" class="sheets-status"></div>
+            </div>
+
+            <div class="divider">
+                <span>או</span>
+            </div>
+
+            <!-- XLS Upload -->
+            <div class="upload-area">
+                <input type="file" id="xlsUpload" accept=".xls,.xlsx" />
+                <label for="xlsUpload" class="upload-btn">
+                    📁 בחר קובץ XLS/XLSX
+                </label>
+            </div>
+            </div><!-- end upload-content -->
+
+        </section>
+
+        <section class="controls-section">
+            <div class="date-range">
+                <label>טווח תאריכים:</label>
+                <input type="date" id="startDate" value="2025-12-21" />
+                <span>עד</span>
+                <input type="date" id="endDate" value="2026-02-01" />
+                <button id="applyDates" class="btn-apply">החל</button>
+            </div>
+            <div class="actions">
+                <button id="refreshData" class="btn-refresh" style="display: none;">🔄 רענן נתונים</button>
+                <button id="exportData" class="btn-export">📥 ייצוא נתונים</button>
+            </div>
+            <div id="sheetInfo" class="sheet-info" style="display: none;">
+                <span id="currentSheetName"></span>
+            </div>
+        </section>
+
+        <section class="attendance-section">
+            <div class="table-container">
+                <table id="attendanceTable">
+                    <thead>
+                        <tr id="headerRow">
+                            <th class="sticky-col col-index">#</th>
+                            <th class="sticky-col col-firstname">שם פרטי</th>
+                            <th class="sticky-col col-lastname">שם משפחה</th>
+                            <th class="sticky-col col-ma">מ.א</th>
+                            <th class="sticky-col col-gdud">גדוד</th>
+                            <th class="sticky-col col-pluga">פלוגה</th>
+                            <th class="sticky-col col-mahlaka">מחלקה</th>
+                            <!-- Date columns will be added dynamically -->
+                        </tr>
+                    </thead>
+                    <tbody id="attendanceBody">
+                        <!-- Rows will be added dynamically -->
+                    </tbody>
+                </table>
+            </div>
+            <p id="noDataMsg" class="no-data">עדיין לא נוספו חברי צוות. טען מ-Google Sheets או העלה קובץ XLS.</p>
+        </section>
+
+        <section class="legend-section">
+            <h3>מקרא (לחץ על תאים כדי לעבור בין סטטוסים)</h3>
+            <div class="legend">
+                <span class="legend-item"><span class="status-box present"></span> נוכח (<span class="status-symbol present-symbol">✓</span>)</span>
+                <span class="legend-item"><span class="status-box absent"></span> נעדר (✗)</span>
+                <span class="legend-item"><span class="status-box arriving"></span> מגיע (+)</span>
+                <span class="legend-item"><span class="status-box leaving"></span> יוצא (-)</span>
+                <span class="legend-item"><span class="status-box counted"></span> חופש (<span class="status-symbol counted-symbol">✓</span>)</span>
+                <span class="legend-item"><span class="status-box unmarked"></span> לא סומן</span>
+            </div>
+        </section>
+    </div>
+
+    <!-- Save Toast Notification -->
+    <div id="saveToast" class="save-toast">נשמר בשרת</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="app.js"></script>
+</body>
+</html>
