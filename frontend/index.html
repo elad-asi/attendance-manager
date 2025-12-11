@@ -152,8 +152,22 @@
                 <p class="modal-subtitle">בחר גיבוי לצפייה בהבדלים או לשחזור</p>
             </div>
             <div class="modal-body">
+                <!-- Google Drive Backups Section -->
+                <div class="backup-list-section drive-section">
+                    <div class="section-header-row">
+                        <h3>☁️ גיבויים ב-Google Drive</h3>
+                        <button id="uploadToDriveBtn" class="btn-upload-drive" onclick="uploadToDrive()">העלה גיבוי ל-Drive</button>
+                    </div>
+                    <div id="driveBackupList" class="backup-list">
+                        <!-- Drive backup items will be added dynamically -->
+                    </div>
+                </div>
+
+                <div class="backup-divider"></div>
+
+                <!-- Local Backups Section -->
                 <div class="backup-list-section">
-                    <h3>גיבויים זמינים</h3>
+                    <h3>💾 גיבויים מקומיים</h3>
                     <div id="backupList" class="backup-list">
                         <!-- Backup items will be added dynamically -->
                     </div>

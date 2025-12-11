@@ -1803,6 +1803,102 @@ thead .col-yamam {
     font-style: italic;
 }
 
+/* Google Drive Backup Styles */
+.drive-section {
+    background: #f0f7ff;
+    border: 1px solid #4285f4;
+    border-radius: 8px;
+    padding: 15px;
+}
+
+.drive-section h3 {
+    color: #4285f4;
+}
+
+.section-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.btn-upload-drive {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #4285f4 0%, #1a73e8 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.btn-upload-drive:hover {
+    background: linear-gradient(135deg, #1a73e8 0%, #1557b0 100%);
+    transform: translateY(-1px);
+}
+
+.btn-upload-drive:disabled {
+    background: #a0c4ff;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.backup-divider {
+    height: 1px;
+    background: #e9ecef;
+    margin: 15px 0;
+}
+
+.backup-source-badge {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    background: #4285f4;
+    color: white;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+.drive-backup {
+    background: #f0f7ff;
+    border: 1px solid #a0c4ff;
+}
+
+.drive-backup:hover {
+    background: #e0efff;
+}
+
+.btn-restore-drive {
+    padding: 6px 12px;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.btn-restore-drive:hover {
+    background: #218838;
+}
+
+.btn-delete-drive {
+    padding: 6px 12px;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.btn-delete-drive:hover {
+    background: #c82333;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .controls-section {

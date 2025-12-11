@@ -8,17 +8,21 @@ from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import database as db
+import drive_backup
 
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '0.3.0'
+BE_VERSION = '0.3.1'
 
 # Configuration
 GOOGLE_CLIENT_ID = '651831609522-bvrgmop9hmdghlrn2tqm1hv0dmkhu933.apps.googleusercontent.com'
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
-SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+SCOPES = [
+    'https://www.googleapis.com/auth/spreadsheets.readonly',
+    'https://www.googleapis.com/auth/drive.file'  # For backup storage
+]
 
 # Ensure data directory exists
 os.makedirs('data', exist_ok=True)
@@ -576,6 +580,56 @@ def restore_backup_api(filename):
         return jsonify({'success': True, 'message': message})
     else:
         return jsonify({'success': False, 'error': message}), 400
+
+# ============================================
+# Google Drive Backup API
+# ============================================
+
+@app.route('/api/drive-backups', methods=['GET'])
+def list_drive_backups():
+    """List all backups from Google Drive"""
+    access_token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not access_token:
+        return jsonify({'error': 'Missing access token', 'backups': []}), 401
+
+    result = drive_backup.list_drive_backups(access_token)
+    return jsonify(result)
+
+@app.route('/api/drive-backups/upload', methods=['POST'])
+def upload_to_drive():
+    """Upload current database to Google Drive"""
+    access_token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not access_token:
+        return jsonify({'error': 'Missing access token'}), 401
+
+    result = drive_backup.upload_backup_to_drive(access_token)
+    if result['success']:
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/drive-backups/restore/<file_id>', methods=['POST'])
+def restore_from_drive(file_id):
+    """Restore database from a Google Drive backup"""
+    access_token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not access_token:
+        return jsonify({'error': 'Missing access token'}), 401
+
+    result = drive_backup.restore_from_drive(access_token, file_id)
+    if result['success']:
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/drive-backups/<file_id>', methods=['DELETE'])
+def delete_from_drive(file_id):
+    """Delete a backup from Google Drive"""
+    access_token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not access_token:
+        return jsonify({'error': 'Missing access token'}), 401
+
+    result = drive_backup.delete_drive_backup(access_token, file_id)
+    if result['success']:
+        return jsonify(result)
+    return jsonify(result), 400
 
 # ============================================
 # Main

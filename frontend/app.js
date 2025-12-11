@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.3.0';
+const FE_VERSION = '0.3.1';
 
 // API Base URL
 const API_BASE = '/api';
@@ -43,7 +43,7 @@ let currentSpreadsheetId = null;
 
 // Google OAuth Configuration
 const GOOGLE_CLIENT_ID = '651831609522-bvrgmop9hmdghlrn2tqm1hv0dmkhu933.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets.readonly';
+const SCOPES = 'https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.file';
 
 // Attendance statuses
 const STATUSES = ['unmarked', 'present', 'absent', 'arriving', 'leaving', 'counted'];
@@ -1634,11 +1634,15 @@ async function openBackupModal() {
 
     // Reset state
     selectedBackupFilename = null;
+    selectedDriveBackupId = null;
     document.getElementById('restoreBackupBtn').style.display = 'none';
     document.getElementById('backupDiffSection').style.display = 'none';
 
-    // Load backups
-    await loadBackupList();
+    // Load both local and Drive backups
+    await Promise.all([
+        loadBackupList(),
+        loadDriveBackupList()
+    ]);
 }
 
 function closeBackupModal() {
@@ -1803,6 +1807,165 @@ async function restoreBackup() {
     } catch (error) {
         console.error('Error restoring backup:', error);
         alert('שגיאה בשחזור הגיבוי');
+    }
+}
+
+// ============================================
+// Google Drive Backup Functions
+// ============================================
+
+let selectedDriveBackupId = null;
+
+async function loadDriveBackupList() {
+    const driveBackupList = document.getElementById('driveBackupList');
+    const uploadToDriveBtn = document.getElementById('uploadToDriveBtn');
+
+    if (!accessToken) {
+        driveBackupList.innerHTML = '<p class="no-backups-message">יש להתחבר לחשבון Google כדי לגבות ל-Drive</p>';
+        uploadToDriveBtn.disabled = true;
+        return;
+    }
+
+    uploadToDriveBtn.disabled = false;
+    driveBackupList.innerHTML = '<p class="no-backups-message">טוען גיבויים מ-Drive...</p>';
+
+    try {
+        const response = await fetch(`${API_BASE}/drive-backups`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        const data = await response.json();
+        const backups = data.backups || [];
+
+        if (backups.length === 0) {
+            driveBackupList.innerHTML = '<p class="no-backups-message">אין גיבויים ב-Google Drive</p>';
+            return;
+        }
+
+        driveBackupList.innerHTML = backups.map(backup => {
+            const date = new Date(backup.timestamp);
+            const formattedDate = date.toLocaleString('he-IL', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            const sizeKB = (backup.size / 1024).toFixed(1);
+
+            return `
+                <div class="backup-item drive-backup" data-fileid="${backup.id}">
+                    <div class="backup-item-info">
+                        <span class="backup-item-date">${formattedDate}</span>
+                        <span class="backup-item-size">${sizeKB} KB</span>
+                        <span class="backup-source-badge">Drive</span>
+                    </div>
+                    <div class="backup-item-actions">
+                        <button class="btn-restore-drive" onclick="restoreFromDrive('${backup.id}')">שחזר</button>
+                        <button class="btn-delete-drive" onclick="deleteFromDrive('${backup.id}')">מחק</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+    } catch (error) {
+        console.error('Error loading Drive backups:', error);
+        driveBackupList.innerHTML = '<p class="no-backups-message">שגיאה בטעינת גיבויים מ-Drive</p>';
+    }
+}
+
+async function uploadToDrive() {
+    if (!accessToken) {
+        alert('יש להתחבר לחשבון Google כדי לגבות ל-Drive');
+        return;
+    }
+
+    const uploadBtn = document.getElementById('uploadToDriveBtn');
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = 'מעלה...';
+
+    try {
+        const response = await fetch(`${API_BASE}/drive-backups/upload`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            showSaveToast('גיבוי הועלה ל-Drive בהצלחה');
+            await loadDriveBackupList();
+        } else {
+            alert('שגיאה בהעלאה ל-Drive: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error uploading to Drive:', error);
+        alert('שגיאה בהעלאה ל-Drive');
+    } finally {
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = 'העלה גיבוי ל-Drive';
+    }
+}
+
+async function restoreFromDrive(fileId) {
+    if (!accessToken) {
+        alert('יש להתחבר לחשבון Google');
+        return;
+    }
+
+    const confirmed = confirm('האם אתה בטוח שברצונך לשחזר את הגיבוי מ-Drive?\nפעולה זו תחליף את כל הנתונים הנוכחיים.');
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/drive-backups/restore/${fileId}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            alert('הגיבוי שוחזר בהצלחה מ-Drive!');
+            closeBackupModal();
+            await loadFromBackend();
+        } else {
+            alert('שגיאה בשחזור מ-Drive: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error restoring from Drive:', error);
+        alert('שגיאה בשחזור מ-Drive');
+    }
+}
+
+async function deleteFromDrive(fileId) {
+    if (!accessToken) {
+        alert('יש להתחבר לחשבון Google');
+        return;
+    }
+
+    const confirmed = confirm('האם אתה בטוח שברצונך למחוק את הגיבוי מ-Drive?');
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/drive-backups/${fileId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            showSaveToast('הגיבוי נמחק מ-Drive');
+            await loadDriveBackupList();
+        } else {
+            alert('שגיאה במחיקה מ-Drive: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error deleting from Drive:', error);
+        alert('שגיאה במחיקה מ-Drive');
     }
 }
 
