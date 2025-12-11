@@ -990,38 +990,43 @@ thead .col-yamam {
 
 /* Present - Green checkmark */
 .attendance-cell.present {
-    background: #d4edda;
+    background: #d4edda !important;
     color: #155724;
 }
 
 /* Absent - Dark Red X */
 .attendance-cell.absent {
-    background: #c62828;
+    background: #c62828 !important;
     color: white;
 }
 
 /* Arriving - Partial (coming this day) */
 .attendance-cell.arriving {
-    background: #cce5ff;
+    background: #cce5ff !important;
     color: #004085;
 }
 
 /* Leaving - Partial (leaving this day) */
 .attendance-cell.leaving {
-    background: #fff3cd;
+    background: #fff3cd !important;
     color: #856404;
 }
 
 /* Counted/חופש - V with light red background */
 .attendance-cell.counted {
-    background: #f8d7da;
+    background: #f8d7da !important;
     color: #721c24;
 }
 
-/* Unmarked */
+/* Unmarked - keep weekend background for unmarked cells */
 .attendance-cell.unmarked {
     background: #f8f9fa;
     color: #adb5bd;
+}
+
+/* Unmarked weekend cells should show weekend color */
+.attendance-cell.unmarked.weekend-cell {
+    background: #fef6e8 !important;
 }
 
 /* Totals Rows */
