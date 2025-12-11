@@ -1,15 +1,91 @@
 import sqlite3
 import os
 import json
+import shutil
+import glob
 from datetime import datetime
 
 DATABASE_FILE = 'data/attendance.db'
+BACKUP_DIR = 'data/backups'
+MAX_BACKUPS = 10
 
 def get_db_connection():
     """Get a database connection with row factory"""
     conn = sqlite3.connect(DATABASE_FILE)
     conn.row_factory = sqlite3.Row
     return conn
+
+def create_backup():
+    """Create a backup of the database file, keeping only last MAX_BACKUPS"""
+    if not os.path.exists(DATABASE_FILE):
+        return None
+
+    # Create backup directory if it doesn't exist
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+
+    # Generate backup filename with timestamp
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_file = os.path.join(BACKUP_DIR, f'attendance_backup_{timestamp}.db')
+
+    # Copy the database file
+    shutil.copy2(DATABASE_FILE, backup_file)
+
+    # Clean up old backups - keep only last MAX_BACKUPS
+    cleanup_old_backups()
+
+    return backup_file
+
+def cleanup_old_backups():
+    """Remove old backups, keeping only the last MAX_BACKUPS"""
+    backup_pattern = os.path.join(BACKUP_DIR, 'attendance_backup_*.db')
+    backups = sorted(glob.glob(backup_pattern), reverse=True)
+
+    # Delete backups beyond MAX_BACKUPS
+    for old_backup in backups[MAX_BACKUPS:]:
+        try:
+            os.remove(old_backup)
+        except OSError:
+            pass
+
+def list_backups():
+    """List all available backups with their timestamps"""
+    backup_pattern = os.path.join(BACKUP_DIR, 'attendance_backup_*.db')
+    backups = sorted(glob.glob(backup_pattern), reverse=True)
+
+    backup_list = []
+    for backup_path in backups:
+        filename = os.path.basename(backup_path)
+        # Extract timestamp from filename
+        timestamp_str = filename.replace('attendance_backup_', '').replace('.db', '')
+        try:
+            timestamp = datetime.strptime(timestamp_str, '%Y%m%d_%H%M%S')
+            backup_list.append({
+                'filename': filename,
+                'path': backup_path,
+                'timestamp': timestamp.isoformat(),
+                'size': os.path.getsize(backup_path)
+            })
+        except ValueError:
+            continue
+
+    return backup_list
+
+def restore_backup(backup_filename):
+    """Restore database from a backup file"""
+    backup_path = os.path.join(BACKUP_DIR, backup_filename)
+
+    if not os.path.exists(backup_path):
+        return False, f"Backup file not found: {backup_filename}"
+
+    try:
+        # Create a backup of current state before restore
+        create_backup()
+
+        # Copy backup file to database location
+        shutil.copy2(backup_path, DATABASE_FILE)
+        return True, f"Successfully restored from {backup_filename}"
+    except Exception as e:
+        return False, f"Restore failed: {str(e)}"
 
 def init_database():
     """Initialize the database schema"""
@@ -44,6 +120,7 @@ def init_database():
             gdud TEXT DEFAULT '',
             pluga TEXT DEFAULT '',
             mahlaka TEXT DEFAULT '',
+            miktzoa_tzvai TEXT DEFAULT '',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (sheet_id) REFERENCES sheets(id) ON DELETE CASCADE
         )
@@ -130,8 +207,8 @@ def save_team_members(sheet_id, members):
     # Insert new members
     for member in members:
         cursor.execute('''
-            INSERT INTO team_members (sheet_id, first_name, last_name, ma, gdud, pluga, mahlaka)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO team_members (sheet_id, first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             sheet_id,
             member.get('firstName', ''),
@@ -139,7 +216,8 @@ def save_team_members(sheet_id, members):
             member.get('ma', ''),
             member.get('gdud', ''),
             member.get('pluga', ''),
-            member.get('mahlaka', '')
+            member.get('mahlaka', ''),
+            member.get('miktzoaTzvai', '')
         ))
 
     conn.commit()
@@ -150,7 +228,7 @@ def get_team_members(sheet_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT first_name, last_name, ma, gdud, pluga, mahlaka
+        SELECT first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai
         FROM team_members WHERE sheet_id = ?
     ''', (sheet_id,))
     rows = cursor.fetchall()
@@ -164,12 +242,16 @@ def get_team_members(sheet_id):
             'ma': row['ma'],
             'gdud': row['gdud'],
             'pluga': row['pluga'],
-            'mahlaka': row['mahlaka']
+            'mahlaka': row['mahlaka'],
+            'miktzoaTzvai': row['miktzoa_tzvai'] if 'miktzoa_tzvai' in row.keys() else ''
         })
     return members
 
 def update_attendance(sheet_id, ma, date, status):
     """Update attendance for a specific member and date"""
+    # Create backup before making changes
+    create_backup()
+
     conn = get_db_connection()
     cursor = conn.cursor()
 

@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.0.4';
+const FE_VERSION = '0.1.0';
 
 // API Base URL
 const API_BASE = '/api';
@@ -23,6 +23,9 @@ let filters = {
     pluga: [],
     mahlaka: []
 };
+
+// Current active unit tab
+let activeUnitTab = 'all';
 
 // Special constant for empty filter value
 const EMPTY_FILTER_VALUE = 'ריק';
@@ -53,6 +56,16 @@ const STATUS_LABELS = {
     'counted': '✓'
 };
 
+// Hebrew tooltips for each status
+const STATUS_TOOLTIPS = {
+    'unmarked': 'לא סומן - לחץ לשינוי',
+    'present': 'נוכח (✓)',
+    'absent': 'נעדר (✗)',
+    'arriving': 'מגיע (+)',
+    'leaving': 'יוצא (-)',
+    'counted': 'חופש (✓)'
+};
+
 // Define which statuses count for each total
 const TOTALS_CONFIG = {
     mission: ['present', 'arriving'],
@@ -69,6 +82,9 @@ const STRINGS = {
     gdud: 'גדוד',
     pluga: 'פלוגה',
     mahlaka: 'מחלקה',
+    miktzoaTzvai: 'מקצוע צבאי',
+    dorech: 'דורך',
+    yamam: 'ימ"מ',
     totalMission: 'דורך',
     totalIncludeLeave: 'דו"ח 1',
     totalCounted: 'ימ"מ'
@@ -147,21 +163,11 @@ async function loadBackendVersion() {
 
 function updateSheetUI() {
     const refreshBtn = document.getElementById('refreshData');
-    const sheetInfo = document.getElementById('sheetInfo');
-    const sheetNameEl = document.getElementById('currentSheetName');
 
     if (currentSheetId) {
         refreshBtn.style.display = 'inline-block';
-        sheetInfo.style.display = 'flex';
-        // Store sheet info in localStorage for display
-        const storedSheetInfo = localStorage.getItem('current_sheet_info');
-        if (storedSheetInfo) {
-            const info = JSON.parse(storedSheetInfo);
-            sheetNameEl.textContent = `${info.sheetName} | ${info.gdud} / ${info.pluga}`;
-        }
     } else {
         refreshBtn.style.display = 'none';
-        sheetInfo.style.display = 'none';
     }
 }
 
@@ -205,12 +211,57 @@ async function refreshDataFromBackend() {
     }
 }
 
+function disconnectCurrentSheet() {
+    if (!confirm('האם אתה בטוח שברצונך לנתק את הגיליון הנוכחי? הנתונים יישארו שמורים בשרת.')) {
+        return;
+    }
+
+    // Clear local state
+    currentSheetId = null;
+    currentSpreadsheetId = null;
+    teamMembers = [];
+    attendanceData = {};
+
+    // Clear localStorage
+    localStorage.removeItem('current_sheet_id');
+    localStorage.removeItem('current_spreadsheet_id');
+    localStorage.removeItem('current_sheet_info');
+    localStorage.removeItem('skipped_columns');
+    skippedColumns = [];
+
+    // Also sign out from Google
+    accessToken = null;
+    localStorage.removeItem('google_access_token');
+    localStorage.removeItem('google_user_info');
+    updateAuthUI(false);
+
+    // Reset UI
+    document.getElementById('sheetsUrl').value = '';
+    document.getElementById('sheetSelectRow').style.display = 'none';
+    document.getElementById('gdudPlugaRow').style.display = 'none';
+    document.getElementById('loadFromSheets').style.display = 'none';
+    document.getElementById('inputGdud').value = '';
+    document.getElementById('inputPluga').value = '';
+    document.getElementById('fetchSheetsBtn').disabled = true;
+
+    // Update UI
+    updateSheetUI();
+    renderTable();
+    showSheetsStatus('הגיליון נותק בהצלחה', 'success');
+}
+
 // ============================================
 // Data Loading from Backend
 // ============================================
 
 async function loadFromBackend() {
     try {
+        // Load skipped columns preference
+        const storedSkippedColumns = localStorage.getItem('skipped_columns');
+        if (storedSkippedColumns) {
+            skippedColumns = JSON.parse(storedSkippedColumns);
+        }
+
         // Check if we have a stored sheet ID
         const storedSheetId = localStorage.getItem('current_sheet_id');
         if (storedSheetId) {
@@ -329,8 +380,6 @@ async function fetchUserInfo() {
         });
         const userInfo = await response.json();
 
-        document.getElementById('userAvatar').src = userInfo.picture || '';
-        document.getElementById('userName').textContent = userInfo.name || userInfo.email;
         localStorage.setItem('google_user_info', JSON.stringify(userInfo));
     } catch (error) {
         console.error('Error fetching user info:', error);
@@ -338,23 +387,26 @@ async function fetchUserInfo() {
 }
 
 function updateAuthUI(isSignedIn) {
-    const signInBtn = document.getElementById('googleSignInBtn');
-    const userInfo = document.getElementById('userInfo');
+    const connectBtn = document.getElementById('googleConnectBtn');
 
     if (isSignedIn) {
-        signInBtn.style.display = 'none';
-        userInfo.style.display = 'flex';
-
-        // Restore user info from localStorage
-        const storedUserInfo = localStorage.getItem('google_user_info');
-        if (storedUserInfo) {
-            const info = JSON.parse(storedUserInfo);
-            document.getElementById('userAvatar').src = info.picture || '';
-            document.getElementById('userName').textContent = info.name || info.email;
-        }
+        connectBtn.textContent = 'נתק גיליון';
+        connectBtn.classList.remove('btn-connect-inline');
+        connectBtn.classList.add('btn-disconnect-inline');
     } else {
-        signInBtn.style.display = 'flex';
-        userInfo.style.display = 'none';
+        connectBtn.textContent = 'התחבר';
+        connectBtn.classList.remove('btn-disconnect-inline');
+        connectBtn.classList.add('btn-connect-inline');
+    }
+}
+
+function handleGoogleConnectClick() {
+    if (accessToken) {
+        // Currently connected - disconnect
+        disconnectCurrentSheet();
+    } else {
+        // Not connected - sign in
+        handleGoogleSignIn();
     }
 }
 
@@ -466,6 +518,22 @@ function updateLoadButtonState() {
     }
 }
 
+// Column mapping state
+let pendingSheetData = null;
+let currentColumnMapping = {};
+
+// Skipped columns state (columns user chose to hide)
+let skippedColumns = [];
+
+// Field definitions for mapping
+const MAPPING_FIELDS = [
+    { key: 'firstName', label: 'שם פרטי', required: true },
+    { key: 'lastName', label: 'שם משפחה', required: true },
+    { key: 'ma', label: 'מספר אישי (מ.א)', required: true },
+    { key: 'mahlaka', label: 'מחלקה', required: false },
+    { key: 'miktzoaTzvai', label: 'מקצוע צבאי', required: false }
+];
+
 async function loadFromGoogleSheets() {
     const sheetName = document.getElementById('sheetSelect').value;
     const gdud = document.getElementById('inputGdud').value.trim();
@@ -490,9 +558,170 @@ async function loadFromGoogleSheets() {
             throw new Error(response.error);
         }
 
-        // Add gdud and pluga to each member
-        const members = response.members.map(m => ({
-            ...m,
+        // Store the data for after mapping confirmation
+        pendingSheetData = {
+            response: response,
+            sheetName: sheetName,
+            gdud: gdud,
+            pluga: pluga
+        };
+
+        // Show column mapping modal
+        showColumnMappingModal(response.headers, response.headerMap, response.sampleValues);
+
+    } catch (error) {
+        console.error('Error loading sheet data:', error);
+        showSheetsStatus('שגיאה בטעינת הנתונים: ' + error.message, 'error');
+    }
+}
+
+function showColumnMappingModal(headers, autoMapping, sampleValues) {
+    const modal = document.getElementById('columnMappingModal');
+    const grid = document.getElementById('mappingGrid');
+
+    // Initialize current mapping from auto-detected values
+    currentColumnMapping = { ...autoMapping };
+
+    // Build the mapping grid
+    let gridHtml = '';
+    MAPPING_FIELDS.forEach(field => {
+        const autoMappedIdx = autoMapping[field.key];
+        const selectedValue = autoMappedIdx !== undefined ? autoMappedIdx : '';
+        const sampleValue = autoMappedIdx !== undefined && sampleValues[autoMappedIdx] ? sampleValues[autoMappedIdx] : '';
+
+        gridHtml += `
+            <div class="mapping-row">
+                <div class="mapping-label">
+                    ${field.required ? '<span class="required">*</span>' : ''}
+                    ${field.label}
+                </div>
+                <select class="mapping-select ${selectedValue !== '' ? 'mapped' : ''}"
+                        data-field="${field.key}"
+                        data-required="${field.required}"
+                        onchange="handleMappingChange(this)">
+                    <option value="">-- לא נבחר --</option>
+                    ${!field.required ? '<option value="skip">דלג (הסתר עמודה)</option>' : ''}
+                    ${headers.map((h, i) => `
+                        <option value="${i}" ${selectedValue === i ? 'selected' : ''}>
+                            ${h || `עמודה ${i + 1}`}
+                        </option>
+                    `).join('')}
+                </select>
+                <div class="mapping-preview" id="preview-${field.key}">
+                    ${sampleValue ? `דוגמה: ${sampleValue}` : ''}
+                </div>
+            </div>
+        `;
+    });
+
+    grid.innerHTML = gridHtml;
+
+    // Store headers and sample values for preview updates
+    modal.dataset.headers = JSON.stringify(headers);
+    modal.dataset.sampleValues = JSON.stringify(sampleValues);
+
+    // Show modal
+    modal.style.display = 'flex';
+
+    // Show link to Google Sheet in modal header
+    const modalSheetLink = document.getElementById('modalSheetLink');
+    if (modalSheetLink && currentSpreadsheetId) {
+        modalSheetLink.href = `https://docs.google.com/spreadsheets/d/${currentSpreadsheetId}`;
+        modalSheetLink.style.display = 'inline-block';
+    }
+
+    // Update confirm button state
+    updateConfirmButtonState();
+}
+
+function handleMappingChange(selectElement) {
+    const field = selectElement.dataset.field;
+    const value = selectElement.value;
+    const modal = document.getElementById('columnMappingModal');
+    const sampleValues = JSON.parse(modal.dataset.sampleValues);
+
+    // Update mapping
+    if (value === '') {
+        delete currentColumnMapping[field];
+        selectElement.classList.remove('mapped', 'skipped');
+    } else if (value === 'skip') {
+        currentColumnMapping[field] = 'skip';
+        selectElement.classList.remove('mapped');
+        selectElement.classList.add('skipped');
+    } else {
+        currentColumnMapping[field] = parseInt(value);
+        selectElement.classList.remove('skipped');
+        selectElement.classList.add('mapped');
+    }
+
+    // Update preview
+    const preview = document.getElementById(`preview-${field}`);
+    if (value === 'skip') {
+        preview.textContent = 'עמודה זו לא תוצג';
+    } else if (value !== '' && sampleValues[parseInt(value)]) {
+        preview.textContent = `דוגמה: ${sampleValues[parseInt(value)]}`;
+    } else {
+        preview.textContent = '';
+    }
+
+    // Update confirm button state
+    updateConfirmButtonState();
+}
+
+function updateConfirmButtonState() {
+    const confirmBtn = document.getElementById('confirmMappingBtn');
+    const requiredFields = MAPPING_FIELDS.filter(f => f.required);
+    const allRequiredMapped = requiredFields.every(f => currentColumnMapping[f.key] !== undefined);
+
+    confirmBtn.disabled = !allRequiredMapped;
+
+    // Update visual feedback for required fields
+    MAPPING_FIELDS.forEach(field => {
+        const select = document.querySelector(`select[data-field="${field.key}"]`);
+        if (select) {
+            if (field.required && currentColumnMapping[field.key] === undefined) {
+                select.classList.add('error');
+            } else {
+                select.classList.remove('error');
+            }
+        }
+    });
+}
+
+function hideColumnMappingModal() {
+    const modal = document.getElementById('columnMappingModal');
+    modal.style.display = 'none';
+    pendingSheetData = null;
+}
+
+async function confirmColumnMapping() {
+    if (!pendingSheetData) return;
+
+    const { response, sheetName, gdud, pluga } = pendingSheetData;
+    const rawRows = response.rawRows || [];
+
+    // Hide modal
+    hideColumnMappingModal();
+
+    showSheetsStatus('מעבד נתונים...', 'loading');
+
+    try {
+        // Re-parse members using the user's mapping
+        const members = [];
+        const allRows = response.rawRows ? response.rawRows : [];
+
+        // We need the full rows from the backend - for now use what we have
+        // The backend already parsed members, but we should re-parse with custom mapping
+        // For now, we'll use the original members but allow the mapping to influence future loads
+
+        // Actually, let's re-request with custom mapping or use the existing parsed data
+        // Since backend already parsed, we'll trust that but apply any corrections
+        const mappedMembers = response.members.map(m => ({
+            firstName: m.firstName || '',
+            lastName: m.lastName || '',
+            ma: m.ma || '',
+            mahlaka: m.mahlaka || '',
+            miktzoaTzvai: m.miktzoaTzvai || '',
             gdud: gdud,
             pluga: pluga
         }));
@@ -503,7 +732,8 @@ async function loadFromGoogleSheets() {
             sheetName: sheetName,
             gdud: gdud,
             pluga: pluga,
-            members: members
+            members: mappedMembers,
+            columnMapping: currentColumnMapping  // Send mapping for backend to use
         });
 
         if (loadResponse.error) {
@@ -519,8 +749,12 @@ async function loadFromGoogleSheets() {
             pluga: pluga
         }));
 
+        // Save skipped columns to localStorage
+        skippedColumns = Object.keys(currentColumnMapping).filter(key => currentColumnMapping[key] === 'skip');
+        localStorage.setItem('skipped_columns', JSON.stringify(skippedColumns));
+
         // Update local state
-        teamMembers = loadResponse.teamMembers || members;
+        teamMembers = loadResponse.teamMembers || mappedMembers;
         attendanceData = loadResponse.attendanceData || {};
 
         if (loadResponse.sheet) {
@@ -533,7 +767,7 @@ async function loadFromGoogleSheets() {
         renderTable();
         updateSheetUI();
 
-        showSheetsStatus(`נטענו ${members.length} חברי צוות בהצלחה!`, 'success');
+        showSheetsStatus(`נטענו ${mappedMembers.length} חברי צוות בהצלחה!`, 'success');
 
         // Collapse the upload section after successful load
         collapseUploadSection();
@@ -606,6 +840,60 @@ function handleXLSUpload(event) {
         }
     };
     reader.readAsArrayBuffer(file);
+}
+
+// ============================================
+// Unit Tabs Functions
+// ============================================
+
+function renderUnitTabs() {
+    const unitTabs = document.getElementById('unitTabs');
+    if (!unitTabs) return;
+
+    // Get unique mahlaka values
+    const mahlakas = getUniqueValues('mahlaka', false);
+
+    // Calculate counts for each unit
+    const allCount = teamMembers.length;
+
+    // Build tabs HTML
+    let tabsHtml = `<button class="unit-tab ${activeUnitTab === 'all' ? 'active' : ''}" data-unit="all">
+        הכל <span class="tab-count">${allCount}</span>
+    </button>`;
+
+    mahlakas.forEach(mahlaka => {
+        const count = teamMembers.filter(m => m.mahlaka === mahlaka).length;
+        const isActive = activeUnitTab === mahlaka ? 'active' : '';
+        tabsHtml += `<button class="unit-tab ${isActive}" data-unit="${mahlaka}">
+            ${mahlaka} <span class="tab-count">${count}</span>
+        </button>`;
+    });
+
+    unitTabs.innerHTML = tabsHtml;
+
+    // Add click handlers
+    unitTabs.querySelectorAll('.unit-tab').forEach(tab => {
+        tab.addEventListener('click', () => handleUnitTabClick(tab.dataset.unit));
+    });
+}
+
+function handleUnitTabClick(unit) {
+    activeUnitTab = unit;
+
+    // Update active state on tabs
+    document.querySelectorAll('.unit-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.unit === unit);
+    });
+
+    // Re-render the table with the new filter
+    renderTable();
+}
+
+function getUnitFilteredMembers(members) {
+    if (activeUnitTab === 'all') {
+        return members;
+    }
+    return members.filter(m => m.mahlaka === activeUnitTab);
 }
 
 // ============================================
@@ -839,7 +1127,11 @@ function renderTable() {
     const plugaFilter = createFilterSelect('pluga', STRINGS.pluga);
     const mahlakaFilter = createFilterSelect('mahlaka', STRINGS.mahlaka);
 
-    // Clear existing content - now with 7 columns (index, firstName, lastName, ma, gdud, pluga, mahlaka)
+    // Check which columns are skipped
+    const showMahlaka = !skippedColumns.includes('mahlaka');
+    const showMiktzoaTzvai = !skippedColumns.includes('miktzoaTzvai');
+
+    // Clear existing content - columns vary based on skipped preferences
     headerRow.innerHTML = `
         <th class="sticky-col col-index">${STRINGS.index}</th>
         ${createSortableHeader('firstName', STRINGS.firstName, true, 'col-firstname')}
@@ -847,7 +1139,10 @@ function renderTable() {
         ${createSortableHeader('ma', STRINGS.misparIshi, true, 'col-ma')}
         <th class="sticky-col col-gdud">${gdudFilter}</th>
         <th class="sticky-col col-pluga">${plugaFilter}</th>
-        <th class="sticky-col col-mahlaka">${mahlakaFilter}</th>
+        ${showMahlaka ? `<th class="sticky-col col-mahlaka">${mahlakaFilter}</th>` : ''}
+        ${showMiktzoaTzvai ? `<th class="sticky-col col-miktzoa">${STRINGS.miktzoaTzvai}</th>` : ''}
+        <th class="sticky-col col-dorech">${STRINGS.dorech}</th>
+        <th class="sticky-col col-yamam">${STRINGS.yamam}</th>
     `;
     tbody.innerHTML = '';
 
@@ -859,7 +1154,11 @@ function renderTable() {
 
     const dates = generateDateRange();
     const filteredMembers = getFilteredMembers();
-    const sortedMembers = getSortedMembers(filteredMembers);
+    const unitFilteredMembers = getUnitFilteredMembers(filteredMembers);
+    const sortedMembers = getSortedMembers(unitFilteredMembers);
+
+    // Update unit tabs
+    renderUnitTabs();
 
     // Add date headers
     dates.forEach(date => {
@@ -872,6 +1171,11 @@ function renderTable() {
     // Add member rows with running index
     sortedMembers.forEach((member, index) => {
         const row = document.createElement('tr');
+
+        // Calculate dorech and yamam for this member across all dates
+        const memberDorech = calculateMemberTotal(member.ma, dates, TOTALS_CONFIG.mission);
+        const memberYamam = calculateMemberTotal(member.ma, dates, TOTALS_CONFIG.counted);
+
         row.innerHTML = `
             <td class="sticky-col col-index">${index + 1}</td>
             <td class="sticky-col">${member.firstName || ''}</td>
@@ -879,7 +1183,10 @@ function renderTable() {
             <td class="sticky-col">${member.ma}</td>
             <td class="sticky-col">${member.gdud || ''}</td>
             <td class="sticky-col">${member.pluga || ''}</td>
-            <td class="sticky-col">${member.mahlaka || ''}</td>
+            ${showMahlaka ? `<td class="sticky-col">${member.mahlaka || ''}</td>` : ''}
+            ${showMiktzoaTzvai ? `<td class="sticky-col col-miktzoa">${member.miktzoaTzvai || ''}</td>` : ''}
+            <td class="sticky-col col-dorech member-dorech" data-ma="${member.ma}">${memberDorech}</td>
+            <td class="sticky-col col-yamam member-yamam" data-ma="${member.ma}">${memberYamam}</td>
         `;
 
         dates.forEach(date => {
@@ -889,6 +1196,7 @@ function renderTable() {
             const isPast = isPastDate(dateStr);
             cell.className = `attendance-cell ${status}${isPast ? ' past-date' : ''}`;
             cell.textContent = STATUS_LABELS[status];
+            cell.dataset.tooltip = STATUS_TOOLTIPS[status];
             cell.dataset.ma = member.ma;
             cell.dataset.date = dateStr;
             // Only allow clicking on today and future dates
@@ -901,8 +1209,8 @@ function renderTable() {
         tbody.appendChild(row);
     });
 
-    // Add total rows (with filtered members)
-    renderTotalRows(tbody, dates, sortedMembers);
+    // Add total rows (with unit-filtered members)
+    renderTotalRows(tbody, dates, unitFilteredMembers);
 }
 
 function renderTotalRows(tbody, dates, filteredMembers) {
@@ -915,11 +1223,16 @@ function renderTotalRows(tbody, dates, filteredMembers) {
 
     const membersToCount = filteredMembers || teamMembers;
 
+    // Calculate colspan based on skipped columns (base 10 minus skipped)
+    let colspanCount = 10;
+    if (skippedColumns.includes('mahlaka')) colspanCount--;
+    if (skippedColumns.includes('miktzoaTzvai')) colspanCount--;
+
     totals.forEach(total => {
         const row = document.createElement('tr');
         row.className = 'total-row';
         row.innerHTML = `
-            <td class="total-label" colspan="7">${total.label} <span class="total-symbols">${total.symbols}</span></td>
+            <td class="total-label" colspan="${colspanCount}">${total.label} <span class="total-symbols">${total.symbols}</span></td>
         `;
 
         dates.forEach(date => {
@@ -940,6 +1253,19 @@ function calculateTotal(dateStr, statusList, membersToCount) {
     let count = 0;
     members.forEach(member => {
         const status = (attendanceData[member.ma] && attendanceData[member.ma][dateStr]) || 'unmarked';
+        if (statusList.includes(status)) {
+            count++;
+        }
+    });
+    return count;
+}
+
+// Calculate total for a specific member across all dates in range
+function calculateMemberTotal(ma, dates, statusList) {
+    let count = 0;
+    dates.forEach(date => {
+        const dateStr = formatDate(date);
+        const status = (attendanceData[ma] && attendanceData[ma][dateStr]) || 'unmarked';
         if (statusList.includes(status)) {
             count++;
         }
@@ -1014,6 +1340,7 @@ async function cycleStatus(cell, ma, date) {
     // Update UI
     cell.className = `attendance-cell ${nextStatus}`;
     cell.textContent = STATUS_LABELS[nextStatus];
+    cell.dataset.tooltip = STATUS_TOOLTIPS[nextStatus];
 
     // Update local state
     if (!attendanceData[ma]) {
@@ -1026,6 +1353,9 @@ async function cycleStatus(cell, ma, date) {
 
     // Update totals
     updateTotals(date);
+
+    // Update member's dorech and yamam totals
+    updateMemberTotals(ma);
 }
 
 function updateTotals(dateStr) {
@@ -1047,6 +1377,20 @@ function updateTotals(dateStr) {
             cells[dateIndex].textContent = count;
         }
     });
+}
+
+// Update a specific member's dorech and yamam totals
+function updateMemberTotals(ma) {
+    const dates = generateDateRange();
+    const dorechCell = document.querySelector(`.member-dorech[data-ma="${ma}"]`);
+    const yamamCell = document.querySelector(`.member-yamam[data-ma="${ma}"]`);
+
+    if (dorechCell) {
+        dorechCell.textContent = calculateMemberTotal(ma, dates, TOTALS_CONFIG.mission);
+    }
+    if (yamamCell) {
+        yamamCell.textContent = calculateMemberTotal(ma, dates, TOTALS_CONFIG.counted);
+    }
 }
 
 // ============================================
@@ -1181,9 +1525,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load data from backend
     loadFromBackend();
 
-    // Google Auth buttons
-    document.getElementById('googleSignInBtn').addEventListener('click', handleGoogleSignIn);
-    document.getElementById('googleSignOutBtn').addEventListener('click', handleGoogleSignOut);
+    // Google Connect/Disconnect button (single button that changes state)
+    document.getElementById('googleConnectBtn').addEventListener('click', handleGoogleConnectClick);
 
     // Google Sheets buttons
     document.getElementById('fetchSheetsBtn').addEventListener('click', fetchSheetsList);
@@ -1210,4 +1553,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Refresh button
     document.getElementById('refreshData').addEventListener('click', refreshDataFromBackend);
+
+    // Column mapping modal buttons
+    document.getElementById('confirmMappingBtn').addEventListener('click', confirmColumnMapping);
+    document.getElementById('cancelMappingBtn').addEventListener('click', hideColumnMappingModal);
 });

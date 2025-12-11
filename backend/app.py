@@ -13,7 +13,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '0.0.4'
+BE_VERSION = '0.1.0'
 
 # Configuration
 GOOGLE_CLIENT_ID = '651831609522-bvrgmop9hmdghlrn2tqm1hv0dmkhu933.apps.googleusercontent.com'
@@ -273,6 +273,9 @@ def get_sheet_data():
             # Department/מחלקה detection
             elif 'מחלקה' in h_clean or h_lower == 'department':
                 header_map['mahlaka'] = i
+            # Military profession/מקצוע צבאי detection
+            elif 'מקצוע צבאי' in h_clean or 'מקצוע' in h_clean:
+                header_map['miktzoaTzvai'] = i
 
         # Parse rows into team members
         members = []
@@ -295,23 +298,70 @@ def get_sheet_data():
                 'firstName': get_value('firstName', 0),
                 'lastName': get_value('lastName', 1),
                 'ma': get_value('ma'),  # No default - must be found in headers
-                'mahlaka': get_value('mahlaka')  # No default - must be found in headers
+                'mahlaka': get_value('mahlaka'),  # No default - must be found in headers
+                'miktzoaTzvai': get_value('miktzoaTzvai')  # Military profession
             }
 
             # Only add if we have at least a name or ma
             if member['firstName'] or member['lastName'] or member['ma']:
                 members.append(member)
 
+        # Also return raw data for custom mapping
+        # Get sample values for each column (first non-empty value)
+        sample_values = []
+        for col_idx in range(len(headers)):
+            sample = ''
+            for row in rows[:5]:  # Check first 5 rows for sample
+                if len(row) > col_idx and row[col_idx] and row[col_idx].strip():
+                    sample = row[col_idx].strip()
+                    break
+            sample_values.append(sample)
+
         return jsonify({
             'success': True,
             'members': members,
-            'headers': headers
+            'headers': headers,
+            'headerMap': header_map,
+            'sampleValues': sample_values,
+            'rawRows': rows[:3]  # Return first 3 rows for preview
         })
 
     except HttpError as e:
         return jsonify({'error': str(e)}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# ============================================
+# Backup API
+# ============================================
+
+@app.route('/api/backups', methods=['GET'])
+def get_backups():
+    """List all available backups"""
+    backups = db.list_backups()
+    return jsonify({'backups': backups})
+
+@app.route('/api/backups/create', methods=['POST'])
+def create_backup():
+    """Manually create a backup"""
+    backup_file = db.create_backup()
+    if backup_file:
+        return jsonify({'success': True, 'backup': backup_file})
+    return jsonify({'error': 'Failed to create backup'}), 500
+
+@app.route('/api/backups/restore', methods=['POST'])
+def restore_backup():
+    """Restore from a backup file"""
+    req = request.json
+    filename = req.get('filename')
+
+    if not filename:
+        return jsonify({'error': 'Missing filename'}), 400
+
+    success, message = db.restore_backup(filename)
+    if success:
+        return jsonify({'success': True, 'message': message})
+    return jsonify({'error': message}), 400
 
 # ============================================
 # Health Check & Version
