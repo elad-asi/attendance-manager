@@ -13,7 +13,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '0.2.0'
+BE_VERSION = '0.3.0'
 
 # Configuration
 GOOGLE_CLIENT_ID = '651831609522-bvrgmop9hmdghlrn2tqm1hv0dmkhu933.apps.googleusercontent.com'
@@ -449,6 +449,133 @@ def health_check():
 def get_version():
     """Get backend version"""
     return jsonify({'version': BE_VERSION})
+
+# ============================================
+# Backup Management
+# ============================================
+
+@app.route('/api/backups', methods=['GET'])
+def list_backups_api():
+    """List all available backups"""
+    backups = db.list_backups()
+    return jsonify({'backups': backups})
+
+@app.route('/api/backups/compare/<filename>', methods=['GET'])
+def compare_backup(filename):
+    """Compare a backup with current data and return differences"""
+    import sqlite3
+
+    backup_path = os.path.join(db.BACKUP_DIR, filename)
+    if not os.path.exists(backup_path):
+        return jsonify({'error': 'Backup not found'}), 404
+
+    # Get current attendance data
+    current_conn = db.get_db_connection()
+    current_cursor = current_conn.cursor()
+    current_cursor.execute('''
+        SELECT a.sheet_id, a.ma, a.date, a.status, t.first_name, t.last_name
+        FROM attendance a
+        LEFT JOIN team_members t ON a.sheet_id = t.sheet_id AND a.ma = t.ma
+    ''')
+    current_data = {f"{row['sheet_id']}_{row['ma']}_{row['date']}": {
+        'status': row['status'],
+        'firstName': row['first_name'] or '',
+        'lastName': row['last_name'] or '',
+        'ma': row['ma'],
+        'date': row['date'],
+        'sheet_id': row['sheet_id']
+    } for row in current_cursor.fetchall()}
+    current_conn.close()
+
+    # Get backup attendance data
+    backup_conn = sqlite3.connect(backup_path)
+    backup_conn.row_factory = sqlite3.Row
+    backup_cursor = backup_conn.cursor()
+
+    # Check if team_members table exists in backup
+    backup_cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='team_members'")
+    has_team_members = backup_cursor.fetchone() is not None
+
+    if has_team_members:
+        backup_cursor.execute('''
+            SELECT a.sheet_id, a.ma, a.date, a.status, t.first_name, t.last_name
+            FROM attendance a
+            LEFT JOIN team_members t ON a.sheet_id = t.sheet_id AND a.ma = t.ma
+        ''')
+    else:
+        backup_cursor.execute('SELECT sheet_id, ma, date, status FROM attendance')
+
+    backup_data = {}
+    for row in backup_cursor.fetchall():
+        key = f"{row['sheet_id']}_{row['ma']}_{row['date']}"
+        backup_data[key] = {
+            'status': row['status'],
+            'firstName': row['first_name'] if has_team_members and row['first_name'] else '',
+            'lastName': row['last_name'] if has_team_members and row['last_name'] else '',
+            'ma': row['ma'],
+            'date': row['date'],
+            'sheet_id': row['sheet_id']
+        }
+    backup_conn.close()
+
+    # Find differences
+    differences = []
+
+    # Check for changes and items only in current
+    all_keys = set(current_data.keys()) | set(backup_data.keys())
+    for key in all_keys:
+        current = current_data.get(key)
+        backup = backup_data.get(key)
+
+        if current and backup:
+            if current['status'] != backup['status']:
+                differences.append({
+                    'type': 'changed',
+                    'ma': current['ma'],
+                    'firstName': current['firstName'],
+                    'lastName': current['lastName'],
+                    'date': current['date'],
+                    'currentStatus': current['status'],
+                    'backupStatus': backup['status']
+                })
+        elif current and not backup:
+            differences.append({
+                'type': 'added',
+                'ma': current['ma'],
+                'firstName': current['firstName'],
+                'lastName': current['lastName'],
+                'date': current['date'],
+                'currentStatus': current['status'],
+                'backupStatus': None
+            })
+        elif backup and not current:
+            differences.append({
+                'type': 'removed',
+                'ma': backup['ma'],
+                'firstName': backup['firstName'],
+                'lastName': backup['lastName'],
+                'date': backup['date'],
+                'currentStatus': None,
+                'backupStatus': backup['status']
+            })
+
+    # Sort by date, then by name
+    differences.sort(key=lambda x: (x['date'], x['lastName'], x['firstName']))
+
+    return jsonify({
+        'filename': filename,
+        'totalDifferences': len(differences),
+        'differences': differences
+    })
+
+@app.route('/api/backups/restore/<filename>', methods=['POST'])
+def restore_backup_api(filename):
+    """Restore database from a backup"""
+    success, message = db.restore_backup(filename)
+    if success:
+        return jsonify({'success': True, 'message': message})
+    else:
+        return jsonify({'success': False, 'error': message}), 400
 
 # ============================================
 # Main

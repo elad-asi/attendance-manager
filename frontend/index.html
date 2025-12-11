@@ -91,6 +91,7 @@
                 <button id="toggleMiktzoa" class="btn-toggle-col">הסתר מקצוע צבאי</button>
                 <button id="refreshData" class="btn-refresh" style="display: none;">🔄 רענן נתונים</button>
                 <button id="exportData" class="btn-export">📥 ייצוא נתונים</button>
+                <button id="backupBtn" class="btn-backup">💾 גיבויים</button>
             </div>
                     </section>
 
@@ -142,6 +143,48 @@
 
     <!-- Save Toast Notification -->
     <div id="saveToast" class="save-toast">נשמר בשרת</div>
+
+    <!-- Backup Modal -->
+    <div id="backupModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content backup-modal">
+            <div class="modal-header">
+                <h2>ניהול גיבויים</h2>
+                <p class="modal-subtitle">בחר גיבוי לצפייה בהבדלים או לשחזור</p>
+            </div>
+            <div class="modal-body">
+                <div class="backup-list-section">
+                    <h3>גיבויים זמינים</h3>
+                    <div id="backupList" class="backup-list">
+                        <!-- Backup items will be added dynamically -->
+                    </div>
+                </div>
+                <div class="backup-diff-section" id="backupDiffSection" style="display: none;">
+                    <h3>הבדלים מהמצב הנוכחי</h3>
+                    <div class="diff-summary" id="diffSummary"></div>
+                    <div class="diff-table-container">
+                        <table class="diff-table" id="diffTable">
+                            <thead>
+                                <tr>
+                                    <th>שם</th>
+                                    <th>מ.א</th>
+                                    <th>תאריך</th>
+                                    <th>סטטוס נוכחי</th>
+                                    <th>סטטוס בגיבוי</th>
+                                    <th>סוג שינוי</th>
+                                </tr>
+                            </thead>
+                            <tbody id="diffTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="restoreBackupBtn" class="btn-restore" style="display: none;">שחזר גיבוי זה</button>
+                <button id="closeBackupModalBtn" class="btn-cancel">סגור</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Column Mapping Modal -->
     <div id="columnMappingModal" class="modal-overlay" style="display: none;">

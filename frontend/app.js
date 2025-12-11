@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.2.0';
+const FE_VERSION = '0.3.0';
 
 // API Base URL
 const API_BASE = '/api';
@@ -1623,6 +1623,190 @@ function updateToggleButtonState() {
 }
 
 // ============================================
+// Backup Management
+// ============================================
+
+let selectedBackupFilename = null;
+
+async function openBackupModal() {
+    const modal = document.getElementById('backupModal');
+    modal.style.display = 'flex';
+
+    // Reset state
+    selectedBackupFilename = null;
+    document.getElementById('restoreBackupBtn').style.display = 'none';
+    document.getElementById('backupDiffSection').style.display = 'none';
+
+    // Load backups
+    await loadBackupList();
+}
+
+function closeBackupModal() {
+    document.getElementById('backupModal').style.display = 'none';
+    selectedBackupFilename = null;
+}
+
+async function loadBackupList() {
+    const backupList = document.getElementById('backupList');
+    backupList.innerHTML = '<p class="no-backups-message">טוען גיבויים...</p>';
+
+    try {
+        const response = await apiGet('/backups');
+        const backups = response.backups || [];
+
+        if (backups.length === 0) {
+            backupList.innerHTML = '<p class="no-backups-message">אין גיבויים זמינים</p>';
+            return;
+        }
+
+        backupList.innerHTML = backups.map(backup => {
+            const date = new Date(backup.timestamp);
+            const formattedDate = date.toLocaleString('he-IL', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            const sizeKB = (backup.size / 1024).toFixed(1);
+
+            return `
+                <div class="backup-item" data-filename="${backup.filename}">
+                    <div class="backup-item-info">
+                        <span class="backup-item-date">${formattedDate}</span>
+                        <span class="backup-item-size">${sizeKB} KB</span>
+                    </div>
+                    <div class="backup-item-actions">
+                        <button class="btn-compare" onclick="compareBackup('${backup.filename}')">השווה</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+    } catch (error) {
+        console.error('Error loading backups:', error);
+        backupList.innerHTML = '<p class="no-backups-message">שגיאה בטעינת גיבויים</p>';
+    }
+}
+
+async function compareBackup(filename) {
+    const diffSection = document.getElementById('backupDiffSection');
+    const diffSummary = document.getElementById('diffSummary');
+    const diffTableBody = document.getElementById('diffTableBody');
+    const restoreBtn = document.getElementById('restoreBackupBtn');
+
+    // Mark selected backup
+    document.querySelectorAll('.backup-item').forEach(item => {
+        item.classList.remove('selected');
+        if (item.dataset.filename === filename) {
+            item.classList.add('selected');
+        }
+    });
+
+    selectedBackupFilename = filename;
+    diffSection.style.display = 'block';
+    diffSummary.textContent = 'טוען הבדלים...';
+    diffSummary.className = 'diff-summary';
+    diffTableBody.innerHTML = '';
+    restoreBtn.style.display = 'none';
+
+    try {
+        const response = await apiGet(`/backups/compare/${filename}`);
+        const differences = response.differences || [];
+
+        if (differences.length === 0) {
+            diffSummary.textContent = 'אין הבדלים בין הגיבוי למצב הנוכחי';
+            diffSummary.className = 'diff-summary no-diff';
+            restoreBtn.style.display = 'none';
+        } else {
+            diffSummary.textContent = `נמצאו ${differences.length} הבדלים`;
+            diffSummary.className = 'diff-summary has-diff';
+            restoreBtn.style.display = 'block';
+
+            diffTableBody.innerHTML = differences.map(diff => {
+                const name = `${diff.firstName} ${diff.lastName}`.trim() || diff.ma;
+                const typeLabel = getChangeTypeLabel(diff.type);
+                const currentStatus = diff.currentStatus ? getStatusBadge(diff.currentStatus) : '<span class="status-badge none">-</span>';
+                const backupStatus = diff.backupStatus ? getStatusBadge(diff.backupStatus) : '<span class="status-badge none">-</span>';
+
+                return `
+                    <tr>
+                        <td>${name}</td>
+                        <td>${diff.ma}</td>
+                        <td>${formatDateForDisplay(diff.date)}</td>
+                        <td>${currentStatus}</td>
+                        <td>${backupStatus}</td>
+                        <td><span class="diff-type ${diff.type}">${typeLabel}</span></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+    } catch (error) {
+        console.error('Error comparing backup:', error);
+        diffSummary.textContent = 'שגיאה בהשוואת הגיבוי';
+        diffSummary.className = 'diff-summary has-diff';
+    }
+}
+
+function getChangeTypeLabel(type) {
+    switch (type) {
+        case 'changed': return 'שונה';
+        case 'added': return 'נוסף';
+        case 'removed': return 'הוסר';
+        default: return type;
+    }
+}
+
+function getStatusBadge(status) {
+    const labels = {
+        'present': 'נוכח',
+        'absent': 'נעדר',
+        'arriving': 'מגיע',
+        'leaving': 'יוצא',
+        'counted': 'חופש',
+        'unmarked': 'לא סומן'
+    };
+    return `<span class="status-badge ${status}">${labels[status] || status}</span>`;
+}
+
+function formatDateForDisplay(dateStr) {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('he-IL', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    });
+}
+
+async function restoreBackup() {
+    if (!selectedBackupFilename) {
+        alert('לא נבחר גיבוי לשחזור');
+        return;
+    }
+
+    const confirmed = confirm('האם אתה בטוח שברצונך לשחזר את הגיבוי?\nפעולה זו תחליף את כל הנתונים הנוכחיים.');
+    if (!confirmed) return;
+
+    try {
+        const response = await apiPost(`/backups/restore/${selectedBackupFilename}`, {});
+
+        if (response.success) {
+            alert('הגיבוי שוחזר בהצלחה!');
+            closeBackupModal();
+            // Reload data from backend
+            await loadFromBackend();
+        } else {
+            alert('שגיאה בשחזור הגיבוי: ' + (response.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error restoring backup:', error);
+        alert('שגיאה בשחזור הגיבוי');
+    }
+}
+
+// ============================================
 // Event Listeners
 // ============================================
 
@@ -1677,4 +1861,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Toggle column visibility
     document.getElementById('toggleMiktzoa').addEventListener('click', toggleMiktzoaColumn);
+
+    // Backup modal buttons
+    document.getElementById('backupBtn').addEventListener('click', openBackupModal);
+    document.getElementById('closeBackupModalBtn').addEventListener('click', closeBackupModal);
+    document.getElementById('restoreBackupBtn').addEventListener('click', restoreBackup);
 });

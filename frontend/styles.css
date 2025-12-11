@@ -1553,6 +1553,256 @@ thead .col-yamam {
     background: #5a6268;
 }
 
+/* Backup Button */
+.btn-backup {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.btn-backup:hover {
+    background: linear-gradient(135deg, #5a6268 0%, #3d4246 100%);
+    transform: translateY(-2px);
+}
+
+/* Backup Modal Specific Styles */
+.backup-modal {
+    max-width: 900px;
+    max-height: 80vh;
+}
+
+.backup-modal .modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.backup-list-section h3,
+.backup-diff-section h3 {
+    color: #2c3e50;
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+}
+
+.backup-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.backup-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.backup-item:hover {
+    background: #e9ecef;
+}
+
+.backup-item.selected {
+    background: #cce5ff;
+    border: 2px solid #004085;
+}
+
+.backup-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.backup-item-date {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.backup-item-size {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+.backup-item-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-compare {
+    padding: 6px 12px;
+    background: #17a2b8;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.btn-compare:hover {
+    background: #138496;
+}
+
+.backup-diff-section {
+    border-top: 1px solid #e9ecef;
+    padding-top: 15px;
+}
+
+.diff-summary {
+    padding: 10px 15px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    font-weight: 500;
+}
+
+.diff-summary.no-diff {
+    background: #d4edda;
+    color: #155724;
+}
+
+.diff-summary.has-diff {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.diff-table-container {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+}
+
+.diff-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.diff-table th {
+    background: #2c3e50;
+    color: white;
+    padding: 10px;
+    text-align: right;
+    position: sticky;
+    top: 0;
+}
+
+.diff-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.diff-table tr:nth-child(even) {
+    background: #f8f9fa;
+}
+
+.diff-table tr:hover {
+    background: #e9ecef;
+}
+
+.diff-type {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.diff-type.changed {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.diff-type.added {
+    background: #d4edda;
+    color: #155724;
+}
+
+.diff-type.removed {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status-badge {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+.status-badge.present {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-badge.absent {
+    background: #c62828;
+    color: white;
+}
+
+.status-badge.arriving {
+    background: #cce5ff;
+    color: #004085;
+}
+
+.status-badge.leaving {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-badge.counted {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status-badge.unmarked {
+    background: #e9ecef;
+    color: #6c757d;
+}
+
+.status-badge.none {
+    background: #e9ecef;
+    color: #adb5bd;
+    font-style: italic;
+}
+
+.btn-restore {
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #28a745 0%, #218838 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.btn-restore:hover {
+    background: linear-gradient(135deg, #218838 0%, #1e7e34 100%);
+    transform: translateY(-2px);
+}
+
+.no-backups-message {
+    padding: 20px;
+    text-align: center;
+    color: #6c757d;
+    font-style: italic;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .controls-section {
