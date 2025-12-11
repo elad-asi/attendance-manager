@@ -554,6 +554,29 @@ header h1 {
     cursor: not-allowed;
 }
 
+.btn-toggle-col {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.btn-toggle-col:hover {
+    background: #5a6268;
+}
+
+.btn-toggle-col.hidden {
+    background: #fd7e14;
+}
+
+.btn-toggle-col.hidden:hover {
+    background: #e96b02;
+}
+
 .sheet-info {
     background: #e8f5e9;
     padding: 8px 16px;
@@ -754,59 +777,48 @@ header h1 {
     color: #2c3e50;
 }
 
+/* Column widths - positions are set dynamically via inline styles */
 .col-index {
-    right: 0;
     min-width: 40px;
     text-align: center;
 }
 
 .col-firstname {
-    right: 40px;
     min-width: 80px;
 }
 
 .col-lastname {
-    right: 120px;
     min-width: 80px;
 }
 
 .col-ma {
-    right: 200px;
     min-width: 70px;
 }
 
 .col-gdud {
-    right: 270px;
     min-width: 70px;
 }
 
 .col-pluga {
-    right: 340px;
     min-width: 70px;
 }
 
 .col-mahlaka {
-    right: 410px;
     min-width: 60px;
 }
 
 .col-miktzoa {
-    right: 470px;
     min-width: 80px;
 }
 
 .col-dorech {
-    right: 550px;
     min-width: 50px;
-    background: #d4edda !important;
     color: #155724;
     font-weight: 600;
 }
 
 .col-yamam {
-    right: 600px;
     min-width: 50px;
-    background: #e2d5f1 !important;
     color: #5a3d8a;
     font-weight: 600;
 }
@@ -848,103 +860,62 @@ thead .col-yamam {
     padding-right: 0;
 }
 
-#attendanceTable tbody tr:nth-child(odd) td:first-child,
-#attendanceTable tbody tr:nth-child(odd) td:nth-child(2),
-#attendanceTable tbody tr:nth-child(odd) td:nth-child(3),
-#attendanceTable tbody tr:nth-child(odd) td:nth-child(4),
-#attendanceTable tbody tr:nth-child(odd) td:nth-child(5),
-#attendanceTable tbody tr:nth-child(odd) td:nth-child(6),
-#attendanceTable tbody tr:nth-child(odd) td:nth-child(7),
-#attendanceTable tbody tr:nth-child(odd) td:nth-child(8) {
+/* Odd rows - sticky columns background */
+#attendanceTable tbody tr:nth-child(odd) td.sticky-col {
     background: white;
 }
 
-#attendanceTable tbody tr:nth-child(odd) td:nth-child(9) {
+/* Odd rows - dorech/yamam special backgrounds */
+#attendanceTable tbody tr:nth-child(odd) td.col-dorech {
     background: #d4edda;
 }
 
-#attendanceTable tbody tr:nth-child(odd) td:nth-child(10) {
+#attendanceTable tbody tr:nth-child(odd) td.col-yamam {
     background: #e2d5f1;
 }
 
-#attendanceTable tbody tr:nth-child(even) td:first-child,
-#attendanceTable tbody tr:nth-child(even) td:nth-child(2),
-#attendanceTable tbody tr:nth-child(even) td:nth-child(3),
-#attendanceTable tbody tr:nth-child(even) td:nth-child(4),
-#attendanceTable tbody tr:nth-child(even) td:nth-child(5),
-#attendanceTable tbody tr:nth-child(even) td:nth-child(6),
-#attendanceTable tbody tr:nth-child(even) td:nth-child(7),
-#attendanceTable tbody tr:nth-child(even) td:nth-child(8) {
+/* Even rows - sticky columns background */
+#attendanceTable tbody tr:nth-child(even) td.sticky-col {
     background: #f8f9fa;
 }
 
-#attendanceTable tbody tr:nth-child(even) td:nth-child(9) {
+/* Even rows - dorech/yamam special backgrounds */
+#attendanceTable tbody tr:nth-child(even) td.col-dorech {
     background: #c8e6c9;
 }
 
-#attendanceTable tbody tr:nth-child(even) td:nth-child(10) {
+#attendanceTable tbody tr:nth-child(even) td.col-yamam {
     background: #d7c9e8;
 }
 
-#attendanceTable tbody tr:hover td:first-child,
-#attendanceTable tbody tr:hover td:nth-child(2),
-#attendanceTable tbody tr:hover td:nth-child(3),
-#attendanceTable tbody tr:hover td:nth-child(4),
-#attendanceTable tbody tr:hover td:nth-child(5),
-#attendanceTable tbody tr:hover td:nth-child(6),
-#attendanceTable tbody tr:hover td:nth-child(7),
-#attendanceTable tbody tr:hover td:nth-child(8) {
+/* Hover state - sticky columns background */
+#attendanceTable tbody tr:hover td.sticky-col {
     background: #e3f2fd;
 }
 
-#attendanceTable tbody tr:hover td:nth-child(9) {
+/* Hover state - dorech/yamam special backgrounds */
+#attendanceTable tbody tr:hover td.col-dorech {
     background: #a5d6a7;
 }
 
-#attendanceTable tbody tr:hover td:nth-child(10) {
+#attendanceTable tbody tr:hover td.col-yamam {
     background: #c9b8dc;
 }
 
-#attendanceTable tbody td:first-child {
-    right: 0;
-}
-
-#attendanceTable tbody td:nth-child(2) {
-    right: 40px;
-}
-
-#attendanceTable tbody td:nth-child(3) {
-    right: 120px;
-}
-
-#attendanceTable tbody td:nth-child(4) {
-    right: 200px;
-}
-
-#attendanceTable tbody td:nth-child(5) {
-    right: 270px;
-}
-
-#attendanceTable tbody td:nth-child(6) {
-    right: 340px;
-}
-
-#attendanceTable tbody td:nth-child(7) {
-    right: 410px;
-}
-
-#attendanceTable tbody td:nth-child(8) {
-    right: 470px;
-}
-
-#attendanceTable tbody td:nth-child(9) {
-    right: 550px;
+/* Dorech/yamam columns center text */
+#attendanceTable tbody td.col-dorech,
+#attendanceTable tbody td.col-yamam {
     text-align: center;
 }
 
-#attendanceTable tbody td:nth-child(10) {
-    right: 600px;
-    text-align: center;
+/* Weekend columns (Friday/Saturday) */
+.weekend-header {
+    background: #e8d5b7 !important;
+    color: #6b4c1d;
+}
+
+.weekend-cell {
+    background: #fef6e8 !important;
 }
 
 /* Attendance Status Cells */

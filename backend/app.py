@@ -13,7 +13,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '0.1.0'
+BE_VERSION = '0.2.0'
 
 # Configuration
 GOOGLE_CLIENT_ID = '651831609522-bvrgmop9hmdghlrn2tqm1hv0dmkhu933.apps.googleusercontent.com'
@@ -324,6 +324,79 @@ def get_sheet_data():
             'headerMap': header_map,
             'sampleValues': sample_values,
             'rawRows': rows[:3]  # Return first 3 rows for preview
+        })
+
+    except HttpError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/sheets/parse-with-mapping', methods=['POST'])
+def parse_sheet_with_mapping():
+    """Parse sheet data using custom column mapping from user"""
+    req = request.json
+    access_token = req.get('accessToken')
+    spreadsheet_id = req.get('spreadsheetId')
+    sheet_name = req.get('sheetName')
+    column_mapping = req.get('columnMapping', {})
+
+    if not all([access_token, spreadsheet_id, sheet_name]):
+        return jsonify({'error': 'Missing required parameters'}), 400
+
+    try:
+        creds = Credentials(token=access_token)
+        service = build('sheets', 'v4', credentials=creds)
+
+        # Get all sheet data
+        result = service.spreadsheets().values().get(
+            spreadsheetId=spreadsheet_id,
+            range=f"'{sheet_name}'!A:AZ"
+        ).execute()
+
+        values = result.get('values', [])
+
+        if not values:
+            return jsonify({'error': 'Sheet is empty'}), 400
+
+        # First row is headers, rest is data
+        headers = values[0]
+        rows = values[1:]
+
+        # Parse rows using the custom column mapping
+        members = []
+        for row in rows:
+            if len(row) == 0:
+                continue
+
+            def get_value(field):
+                idx = column_mapping.get(field)
+                # Skip if marked as 'skip' or not mapped
+                if idx == 'skip' or idx is None:
+                    return ''
+                if isinstance(idx, int) and len(row) > idx:
+                    val = row[idx]
+                    # Treat "?" as empty
+                    if val == '?' or (isinstance(val, str) and val.strip() == '?'):
+                        return ''
+                    return str(val).strip() if val else ''
+                return ''
+
+            member = {
+                'firstName': get_value('firstName'),
+                'lastName': get_value('lastName'),
+                'ma': get_value('ma'),
+                'mahlaka': get_value('mahlaka'),
+                'miktzoaTzvai': get_value('miktzoaTzvai')
+            }
+
+            # Only add if we have at least firstName or lastName or ma
+            if member['firstName'] or member['lastName'] or member['ma']:
+                members.append(member)
+
+        return jsonify({
+            'success': True,
+            'members': members,
+            'count': len(members)
         })
 
     except HttpError as e:

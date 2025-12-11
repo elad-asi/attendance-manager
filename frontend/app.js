@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.1.0';
+const FE_VERSION = '0.2.0';
 
 // API Base URL
 const API_BASE = '/api';
@@ -227,7 +227,9 @@ function disconnectCurrentSheet() {
     localStorage.removeItem('current_spreadsheet_id');
     localStorage.removeItem('current_sheet_info');
     localStorage.removeItem('skipped_columns');
+    localStorage.removeItem('permanently_skipped_columns');
     skippedColumns = [];
+    permanentlySkippedColumns = [];
 
     // Also sign out from Google
     accessToken = null;
@@ -256,7 +258,13 @@ function disconnectCurrentSheet() {
 
 async function loadFromBackend() {
     try {
-        // Load skipped columns preference
+        // Load permanently skipped columns (from mapping - no data loaded for these)
+        const storedPermanentlySkipped = localStorage.getItem('permanently_skipped_columns');
+        if (storedPermanentlySkipped) {
+            permanentlySkippedColumns = JSON.parse(storedPermanentlySkipped);
+        }
+
+        // Load skipped columns preference (includes both permanent and user-toggled)
         const storedSkippedColumns = localStorage.getItem('skipped_columns');
         if (storedSkippedColumns) {
             skippedColumns = JSON.parse(storedSkippedColumns);
@@ -290,6 +298,7 @@ async function loadFromBackend() {
 
         renderTable();
         updateSheetUI();
+        updateToggleButtonState();
 
         // Collapse upload section if we have data
         if (teamMembers.length > 0) {
@@ -522,8 +531,11 @@ function updateLoadButtonState() {
 let pendingSheetData = null;
 let currentColumnMapping = {};
 
-// Skipped columns state (columns user chose to hide)
+// Skipped columns state (columns user chose to hide via toggle button)
 let skippedColumns = [];
+
+// Permanently skipped columns (columns user chose to skip during mapping - no data loaded)
+let permanentlySkippedColumns = [];
 
 // Field definitions for mapping
 const MAPPING_FIELDS = [
@@ -698,7 +710,6 @@ async function confirmColumnMapping() {
     if (!pendingSheetData) return;
 
     const { response, sheetName, gdud, pluga } = pendingSheetData;
-    const rawRows = response.rawRows || [];
 
     // Hide modal
     hideColumnMappingModal();
@@ -706,22 +717,26 @@ async function confirmColumnMapping() {
     showSheetsStatus('מעבד נתונים...', 'loading');
 
     try {
-        // Re-parse members using the user's mapping
-        const members = [];
-        const allRows = response.rawRows ? response.rawRows : [];
+        // Re-parse members using the user's custom column mapping
+        // We need to fetch all rows from backend with custom mapping
+        const parseResponse = await apiPost('/sheets/parse-with-mapping', {
+            accessToken: accessToken,
+            spreadsheetId: currentSpreadsheetId,
+            sheetName: sheetName,
+            columnMapping: currentColumnMapping
+        });
 
-        // We need the full rows from the backend - for now use what we have
-        // The backend already parsed members, but we should re-parse with custom mapping
-        // For now, we'll use the original members but allow the mapping to influence future loads
+        if (parseResponse.error) {
+            throw new Error(parseResponse.error);
+        }
 
-        // Actually, let's re-request with custom mapping or use the existing parsed data
-        // Since backend already parsed, we'll trust that but apply any corrections
-        const mappedMembers = response.members.map(m => ({
+        // Add gdud and pluga to all members
+        const mappedMembers = parseResponse.members.map(m => ({
             firstName: m.firstName || '',
             lastName: m.lastName || '',
             ma: m.ma || '',
-            mahlaka: m.mahlaka || '',
-            miktzoaTzvai: m.miktzoaTzvai || '',
+            mahlaka: currentColumnMapping.mahlaka === 'skip' ? '' : (m.mahlaka || ''),
+            miktzoaTzvai: currentColumnMapping.miktzoaTzvai === 'skip' ? '' : (m.miktzoaTzvai || ''),
             gdud: gdud,
             pluga: pluga
         }));
@@ -749,8 +764,12 @@ async function confirmColumnMapping() {
             pluga: pluga
         }));
 
-        // Save skipped columns to localStorage
-        skippedColumns = Object.keys(currentColumnMapping).filter(key => currentColumnMapping[key] === 'skip');
+        // Save permanently skipped columns (from mapping) to localStorage
+        permanentlySkippedColumns = Object.keys(currentColumnMapping).filter(key => currentColumnMapping[key] === 'skip');
+        localStorage.setItem('permanently_skipped_columns', JSON.stringify(permanentlySkippedColumns));
+
+        // Also set skippedColumns to include permanently skipped ones
+        skippedColumns = [...permanentlySkippedColumns];
         localStorage.setItem('skipped_columns', JSON.stringify(skippedColumns));
 
         // Update local state
@@ -766,6 +785,7 @@ async function confirmColumnMapping() {
 
         renderTable();
         updateSheetUI();
+        updateToggleButtonState();
 
         showSheetsStatus(`נטענו ${mappedMembers.length} חברי צוות בהצלחה!`, 'success');
 
@@ -915,9 +935,10 @@ function formatDate(date) {
 }
 
 function formatDateDisplay(date) {
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    return `${day}/${month}`;
+    const day = date.getDate();
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = monthNames[date.getMonth()];
+    return `${month} ${day}`;
 }
 
 function formatDateDisplayFull(date) {
@@ -938,6 +959,17 @@ function isPastDate(dateStr) {
     const checkDate = new Date(dateStr);
     checkDate.setHours(0, 0, 0, 0);
     return checkDate < today;
+}
+
+function isWeekend(date) {
+    // Friday = 5, Saturday = 6
+    const day = date.getDay();
+    return day === 5 || day === 6;
+}
+
+function getDayName(date) {
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return dayNames[date.getDay()];
 }
 
 function updateCurrentDateDisplay() {
@@ -1076,13 +1108,14 @@ document.addEventListener('click', function(e) {
 });
 
 // Create sortable header
-function createSortableHeader(field, label, isSticky = true, colClass = '') {
+function createSortableHeader(field, label, isSticky = true, colClass = '', rightPosition = null) {
     const isSorted = sortConfig.field === field;
     const sortIndicator = isSorted ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : '';
     const stickyClass = isSticky ? 'sticky-col' : '';
     const activeClass = isSorted ? 'sort-active' : '';
+    const styleAttr = rightPosition !== null ? `style="right: ${rightPosition}px"` : '';
 
-    return `<th class="${stickyClass} ${colClass} sortable-header ${activeClass}" onclick="handleSort('${field}')">
+    return `<th class="${stickyClass} ${colClass} sortable-header ${activeClass}" ${styleAttr} onclick="handleSort('${field}')">
         ${label}${sortIndicator}
     </th>`;
 }
@@ -1131,18 +1164,46 @@ function renderTable() {
     const showMahlaka = !skippedColumns.includes('mahlaka');
     const showMiktzoaTzvai = !skippedColumns.includes('miktzoaTzvai');
 
+    // Calculate right positions dynamically based on visible columns
+    // Base widths: index=40, firstname=80, lastname=80, ma=70, gdud=70, pluga=70, mahlaka=60, miktzoa=80, dorech=50, yamam=50
+    let rightPos = 0;
+    const colPositions = {};
+    colPositions.index = rightPos;
+    rightPos += 40;
+    colPositions.firstname = rightPos;
+    rightPos += 80;
+    colPositions.lastname = rightPos;
+    rightPos += 80;
+    colPositions.ma = rightPos;
+    rightPos += 70;
+    colPositions.gdud = rightPos;
+    rightPos += 70;
+    colPositions.pluga = rightPos;
+    rightPos += 70;
+    if (showMahlaka) {
+        colPositions.mahlaka = rightPos;
+        rightPos += 60;
+    }
+    if (showMiktzoaTzvai) {
+        colPositions.miktzoa = rightPos;
+        rightPos += 80;
+    }
+    colPositions.dorech = rightPos;
+    rightPos += 50;
+    colPositions.yamam = rightPos;
+
     // Clear existing content - columns vary based on skipped preferences
     headerRow.innerHTML = `
-        <th class="sticky-col col-index">${STRINGS.index}</th>
-        ${createSortableHeader('firstName', STRINGS.firstName, true, 'col-firstname')}
-        ${createSortableHeader('lastName', STRINGS.lastName, true, 'col-lastname')}
-        ${createSortableHeader('ma', STRINGS.misparIshi, true, 'col-ma')}
-        <th class="sticky-col col-gdud">${gdudFilter}</th>
-        <th class="sticky-col col-pluga">${plugaFilter}</th>
-        ${showMahlaka ? `<th class="sticky-col col-mahlaka">${mahlakaFilter}</th>` : ''}
-        ${showMiktzoaTzvai ? `<th class="sticky-col col-miktzoa">${STRINGS.miktzoaTzvai}</th>` : ''}
-        <th class="sticky-col col-dorech">${STRINGS.dorech}</th>
-        <th class="sticky-col col-yamam">${STRINGS.yamam}</th>
+        <th class="sticky-col col-index" style="right: ${colPositions.index}px">${STRINGS.index}</th>
+        ${createSortableHeader('firstName', STRINGS.firstName, true, 'col-firstname', colPositions.firstname)}
+        ${createSortableHeader('lastName', STRINGS.lastName, true, 'col-lastname', colPositions.lastname)}
+        ${createSortableHeader('ma', STRINGS.misparIshi, true, 'col-ma', colPositions.ma)}
+        <th class="sticky-col col-gdud" style="right: ${colPositions.gdud}px">${gdudFilter}</th>
+        <th class="sticky-col col-pluga" style="right: ${colPositions.pluga}px">${plugaFilter}</th>
+        ${showMahlaka ? `<th class="sticky-col col-mahlaka" style="right: ${colPositions.mahlaka}px">${mahlakaFilter}</th>` : ''}
+        ${showMiktzoaTzvai ? `<th class="sticky-col col-miktzoa" style="right: ${colPositions.miktzoa}px">${STRINGS.miktzoaTzvai}</th>` : ''}
+        <th class="sticky-col col-dorech" style="right: ${colPositions.dorech}px">${STRINGS.dorech}</th>
+        <th class="sticky-col col-yamam" style="right: ${colPositions.yamam}px">${STRINGS.yamam}</th>
     `;
     tbody.innerHTML = '';
 
@@ -1163,8 +1224,11 @@ function renderTable() {
     // Add date headers
     dates.forEach(date => {
         const th = document.createElement('th');
-        th.textContent = formatDateDisplay(date);
+        th.innerHTML = `${formatDateDisplay(date)}<br><small>${getDayName(date)}</small>`;
         th.title = formatDate(date);
+        if (isWeekend(date)) {
+            th.classList.add('weekend-header');
+        }
         headerRow.appendChild(th);
     });
 
@@ -1177,16 +1241,16 @@ function renderTable() {
         const memberYamam = calculateMemberTotal(member.ma, dates, TOTALS_CONFIG.counted);
 
         row.innerHTML = `
-            <td class="sticky-col col-index">${index + 1}</td>
-            <td class="sticky-col">${member.firstName || ''}</td>
-            <td class="sticky-col">${member.lastName || ''}</td>
-            <td class="sticky-col">${member.ma}</td>
-            <td class="sticky-col">${member.gdud || ''}</td>
-            <td class="sticky-col">${member.pluga || ''}</td>
-            ${showMahlaka ? `<td class="sticky-col">${member.mahlaka || ''}</td>` : ''}
-            ${showMiktzoaTzvai ? `<td class="sticky-col col-miktzoa">${member.miktzoaTzvai || ''}</td>` : ''}
-            <td class="sticky-col col-dorech member-dorech" data-ma="${member.ma}">${memberDorech}</td>
-            <td class="sticky-col col-yamam member-yamam" data-ma="${member.ma}">${memberYamam}</td>
+            <td class="sticky-col col-index" style="right: ${colPositions.index}px">${index + 1}</td>
+            <td class="sticky-col" style="right: ${colPositions.firstname}px">${member.firstName || ''}</td>
+            <td class="sticky-col" style="right: ${colPositions.lastname}px">${member.lastName || ''}</td>
+            <td class="sticky-col" style="right: ${colPositions.ma}px">${member.ma}</td>
+            <td class="sticky-col" style="right: ${colPositions.gdud}px">${member.gdud || ''}</td>
+            <td class="sticky-col" style="right: ${colPositions.pluga}px">${member.pluga || ''}</td>
+            ${showMahlaka ? `<td class="sticky-col" style="right: ${colPositions.mahlaka}px">${member.mahlaka || ''}</td>` : ''}
+            ${showMiktzoaTzvai ? `<td class="sticky-col col-miktzoa" style="right: ${colPositions.miktzoa}px">${member.miktzoaTzvai || ''}</td>` : ''}
+            <td class="sticky-col col-dorech member-dorech" style="right: ${colPositions.dorech}px" data-ma="${member.ma}">${memberDorech}</td>
+            <td class="sticky-col col-yamam member-yamam" style="right: ${colPositions.yamam}px" data-ma="${member.ma}">${memberYamam}</td>
         `;
 
         dates.forEach(date => {
@@ -1194,7 +1258,8 @@ function renderTable() {
             const status = (attendanceData[member.ma] && attendanceData[member.ma][dateStr]) || 'unmarked';
             const cell = document.createElement('td');
             const isPast = isPastDate(dateStr);
-            cell.className = `attendance-cell ${status}${isPast ? ' past-date' : ''}`;
+            const weekend = isWeekend(date);
+            cell.className = `attendance-cell ${status}${isPast ? ' past-date' : ''}${weekend ? ' weekend-cell' : ''}`;
             cell.textContent = STATUS_LABELS[status];
             cell.dataset.tooltip = STATUS_TOOLTIPS[status];
             cell.dataset.ma = member.ma;
@@ -1506,6 +1571,58 @@ async function clearAllData() {
 }
 
 // ============================================
+// Column Visibility Toggle
+// ============================================
+
+function toggleMiktzoaColumn() {
+    const btn = document.getElementById('toggleMiktzoa');
+    const isCurrentlyHidden = skippedColumns.includes('miktzoaTzvai');
+
+    if (isCurrentlyHidden) {
+        // Show the column
+        skippedColumns = skippedColumns.filter(col => col !== 'miktzoaTzvai');
+        btn.textContent = 'הסתר מקצוע צבאי';
+        btn.classList.remove('hidden');
+    } else {
+        // Hide the column
+        if (!skippedColumns.includes('miktzoaTzvai')) {
+            skippedColumns.push('miktzoaTzvai');
+        }
+        btn.textContent = 'הצג מקצוע צבאי';
+        btn.classList.add('hidden');
+    }
+
+    // Save preference to localStorage
+    localStorage.setItem('skipped_columns', JSON.stringify(skippedColumns));
+
+    // Re-render table
+    renderTable();
+}
+
+function updateToggleButtonState() {
+    const btn = document.getElementById('toggleMiktzoa');
+    if (!btn) return;
+
+    // If the column was permanently skipped during mapping, hide the button entirely
+    if (permanentlySkippedColumns.includes('miktzoaTzvai')) {
+        btn.style.display = 'none';
+        return;
+    }
+
+    // Show the button
+    btn.style.display = '';
+
+    const isHidden = skippedColumns.includes('miktzoaTzvai');
+    if (isHidden) {
+        btn.textContent = 'הצג מקצוע צבאי';
+        btn.classList.add('hidden');
+    } else {
+        btn.textContent = 'הסתר מקצוע צבאי';
+        btn.classList.remove('hidden');
+    }
+}
+
+// ============================================
 // Event Listeners
 // ============================================
 
@@ -1557,4 +1674,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Column mapping modal buttons
     document.getElementById('confirmMappingBtn').addEventListener('click', confirmColumnMapping);
     document.getElementById('cancelMappingBtn').addEventListener('click', hideColumnMappingModal);
+
+    // Toggle column visibility
+    document.getElementById('toggleMiktzoa').addEventListener('click', toggleMiktzoaColumn);
 });
