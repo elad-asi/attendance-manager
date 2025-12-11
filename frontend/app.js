@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.3.1';
+const FE_VERSION = '0.4.1';
 
 // API Base URL
 const API_BASE = '/api';
@@ -1811,37 +1811,60 @@ async function restoreBackup() {
 }
 
 // ============================================
-// Google Drive Backup Functions
+// Cloud Backup Functions (Dropbox)
 // ============================================
 
-let selectedDriveBackupId = null;
+let cloudConfigured = false;
 
-async function loadDriveBackupList() {
-    const driveBackupList = document.getElementById('driveBackupList');
-    const uploadToDriveBtn = document.getElementById('uploadToDriveBtn');
-
-    if (!accessToken) {
-        driveBackupList.innerHTML = '<p class="no-backups-message">יש להתחבר לחשבון Google כדי לגבות ל-Drive</p>';
-        uploadToDriveBtn.disabled = true;
-        return;
+async function checkCloudStatus() {
+    try {
+        const response = await fetch(`${API_BASE}/cloud-backups/status`);
+        const data = await response.json();
+        cloudConfigured = data.configured;
+        return cloudConfigured;
+    } catch (error) {
+        console.error('Error checking cloud status:', error);
+        cloudConfigured = false;
+        return false;
     }
+}
 
-    uploadToDriveBtn.disabled = false;
-    driveBackupList.innerHTML = '<p class="no-backups-message">טוען גיבויים מ-Drive...</p>';
+async function loadCloudBackupList() {
+    const cloudBackupList = document.getElementById('driveBackupList');
+    const uploadToCloudBtn = document.getElementById('uploadToDriveBtn');
+
+    cloudBackupList.innerHTML = '<p class="no-backups-message">טוען גיבויים מהענן...</p>';
 
     try {
-        const response = await fetch(`${API_BASE}/drive-backups`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-        const data = await response.json();
-        const backups = data.backups || [];
+        // First check if configured
+        const statusResponse = await fetch(`${API_BASE}/cloud-backups/status`);
+        const statusData = await statusResponse.json();
 
-        if (backups.length === 0) {
-            driveBackupList.innerHTML = '<p class="no-backups-message">אין גיבויים ב-Google Drive</p>';
+        if (!statusData.configured) {
+            cloudBackupList.innerHTML = '<p class="no-backups-message">גיבוי ענן לא זמין</p>';
+            uploadToCloudBtn.disabled = true;
             return;
         }
 
-        driveBackupList.innerHTML = backups.map(backup => {
+        const response = await fetch(`${API_BASE}/cloud-backups`);
+        const data = await response.json();
+
+        if (!data.success && data.error) {
+            cloudBackupList.innerHTML = '<p class="no-backups-message">שגיאה: ' + data.error + '</p>';
+            uploadToCloudBtn.disabled = true;
+            alert('שגיאה בגיבוי ענן: ' + data.error);
+            return;
+        }
+
+        uploadToCloudBtn.disabled = false;
+        const backups = data.backups || [];
+
+        if (backups.length === 0) {
+            cloudBackupList.innerHTML = '<p class="no-backups-message">אין גיבויים בענן</p>';
+            return;
+        }
+
+        cloudBackupList.innerHTML = backups.map(backup => {
             const date = new Date(backup.timestamp);
             const formattedDate = date.toLocaleString('he-IL', {
                 year: 'numeric',
@@ -1852,122 +1875,116 @@ async function loadDriveBackupList() {
                 second: '2-digit'
             });
             const sizeKB = (backup.size / 1024).toFixed(1);
+            // Escape path for use in onclick
+            const escapedPath = backup.path.replace(/'/g, "\\'");
 
             return `
-                <div class="backup-item drive-backup" data-fileid="${backup.id}">
+                <div class="backup-item cloud-backup" data-path="${backup.path}">
                     <div class="backup-item-info">
                         <span class="backup-item-date">${formattedDate}</span>
                         <span class="backup-item-size">${sizeKB} KB</span>
-                        <span class="backup-source-badge">Drive</span>
+                        <span class="backup-source-badge">ענן</span>
                     </div>
                     <div class="backup-item-actions">
-                        <button class="btn-restore-drive" onclick="restoreFromDrive('${backup.id}')">שחזר</button>
-                        <button class="btn-delete-drive" onclick="deleteFromDrive('${backup.id}')">מחק</button>
+                        <button class="btn-restore-cloud" onclick="restoreFromCloud('${escapedPath}')">שחזר</button>
+                        <button class="btn-delete-cloud" onclick="deleteFromCloud('${escapedPath}')">מחק</button>
                     </div>
                 </div>
             `;
         }).join('');
 
     } catch (error) {
-        console.error('Error loading Drive backups:', error);
-        driveBackupList.innerHTML = '<p class="no-backups-message">שגיאה בטעינת גיבויים מ-Drive</p>';
+        console.error('Error loading cloud backups:', error);
+        cloudBackupList.innerHTML = '<p class="no-backups-message">שגיאה בטעינת גיבויים מהענן</p>';
+        alert('שגיאה בטעינת גיבויים מהענן: ' + error.message);
     }
 }
 
-async function uploadToDrive() {
-    if (!accessToken) {
-        alert('יש להתחבר לחשבון Google כדי לגבות ל-Drive');
-        return;
-    }
-
+async function uploadToCloud() {
     const uploadBtn = document.getElementById('uploadToDriveBtn');
     uploadBtn.disabled = true;
     uploadBtn.textContent = 'מעלה...';
 
     try {
-        const response = await fetch(`${API_BASE}/drive-backups/upload`, {
+        const response = await fetch(`${API_BASE}/cloud-backups/upload`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
             }
         });
         const data = await response.json();
 
         if (data.success) {
-            showSaveToast('גיבוי הועלה ל-Drive בהצלחה');
-            await loadDriveBackupList();
+            showSaveToast('גיבוי הועלה לענן בהצלחה');
+            await loadCloudBackupList();
         } else {
-            alert('שגיאה בהעלאה ל-Drive: ' + (data.error || 'Unknown error'));
+            alert('שגיאה בהעלאה לענן: ' + (data.error || 'Unknown error'));
         }
     } catch (error) {
-        console.error('Error uploading to Drive:', error);
-        alert('שגיאה בהעלאה ל-Drive');
+        console.error('Error uploading to cloud:', error);
+        alert('שגיאה בהעלאה לענן');
     } finally {
         uploadBtn.disabled = false;
-        uploadBtn.textContent = 'העלה גיבוי ל-Drive';
+        uploadBtn.textContent = 'העלה גיבוי לענן';
     }
 }
 
-async function restoreFromDrive(fileId) {
-    if (!accessToken) {
-        alert('יש להתחבר לחשבון Google');
-        return;
-    }
-
-    const confirmed = confirm('האם אתה בטוח שברצונך לשחזר את הגיבוי מ-Drive?\nפעולה זו תחליף את כל הנתונים הנוכחיים.');
+async function restoreFromCloud(filePath) {
+    const confirmed = confirm('האם אתה בטוח שברצונך לשחזר את הגיבוי מהענן?\nפעולה זו תחליף את כל הנתונים הנוכחיים.');
     if (!confirmed) return;
 
     try {
-        const response = await fetch(`${API_BASE}/drive-backups/restore/${fileId}`, {
+        const response = await fetch(`${API_BASE}/cloud-backups/restore`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({ path: filePath })
         });
         const data = await response.json();
 
         if (data.success) {
-            alert('הגיבוי שוחזר בהצלחה מ-Drive!');
+            alert('הגיבוי שוחזר בהצלחה מהענן!');
             closeBackupModal();
             await loadFromBackend();
         } else {
-            alert('שגיאה בשחזור מ-Drive: ' + (data.error || 'Unknown error'));
+            alert('שגיאה בשחזור מהענן: ' + (data.error || 'Unknown error'));
         }
     } catch (error) {
-        console.error('Error restoring from Drive:', error);
-        alert('שגיאה בשחזור מ-Drive');
+        console.error('Error restoring from cloud:', error);
+        alert('שגיאה בשחזור מהענן');
     }
 }
 
-async function deleteFromDrive(fileId) {
-    if (!accessToken) {
-        alert('יש להתחבר לחשבון Google');
-        return;
-    }
-
-    const confirmed = confirm('האם אתה בטוח שברצונך למחוק את הגיבוי מ-Drive?');
+async function deleteFromCloud(filePath) {
+    const confirmed = confirm('האם אתה בטוח שברצונך למחוק את הגיבוי מהענן?');
     if (!confirmed) return;
 
     try {
-        const response = await fetch(`${API_BASE}/drive-backups/${fileId}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${accessToken}` }
+        const response = await fetch(`${API_BASE}/cloud-backups/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ path: filePath })
         });
         const data = await response.json();
 
         if (data.success) {
-            showSaveToast('הגיבוי נמחק מ-Drive');
-            await loadDriveBackupList();
+            showSaveToast('הגיבוי נמחק מהענן');
+            await loadCloudBackupList();
         } else {
-            alert('שגיאה במחיקה מ-Drive: ' + (data.error || 'Unknown error'));
+            alert('שגיאה במחיקה מהענן: ' + (data.error || 'Unknown error'));
         }
     } catch (error) {
-        console.error('Error deleting from Drive:', error);
-        alert('שגיאה במחיקה מ-Drive');
+        console.error('Error deleting from cloud:', error);
+        alert('שגיאה במחיקה מהענן');
     }
 }
+
+// Legacy function names for compatibility
+const loadDriveBackupList = loadCloudBackupList;
+const uploadToDrive = uploadToCloud;
 
 // ============================================
 // Event Listeners

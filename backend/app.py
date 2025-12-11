@@ -8,13 +8,13 @@ from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import database as db
-import drive_backup
+import cloud_backup
 
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '0.3.1'
+BE_VERSION = '0.4.2'
 
 # Configuration
 GOOGLE_CLIENT_ID = '651831609522-bvrgmop9hmdghlrn2tqm1hv0dmkhu933.apps.googleusercontent.com'
@@ -582,54 +582,55 @@ def restore_backup_api(filename):
         return jsonify({'success': False, 'error': message}), 400
 
 # ============================================
-# Google Drive Backup API
+# Cloud Backup API (JSONBin.io)
 # ============================================
 
-@app.route('/api/drive-backups', methods=['GET'])
-def list_drive_backups():
-    """List all backups from Google Drive"""
-    access_token = request.headers.get('Authorization', '').replace('Bearer ', '')
-    if not access_token:
-        return jsonify({'error': 'Missing access token', 'backups': []}), 401
-
-    result = drive_backup.list_drive_backups(access_token)
+@app.route('/api/cloud-backups', methods=['GET'])
+def list_cloud_backups():
+    """List all backups from cloud"""
+    result = cloud_backup.list_cloud_backups()
     return jsonify(result)
 
-@app.route('/api/drive-backups/upload', methods=['POST'])
-def upload_to_drive():
-    """Upload current database to Google Drive"""
-    access_token = request.headers.get('Authorization', '').replace('Bearer ', '')
-    if not access_token:
-        return jsonify({'error': 'Missing access token'}), 401
-
-    result = drive_backup.upload_backup_to_drive(access_token)
+@app.route('/api/cloud-backups/upload', methods=['POST'])
+def upload_to_cloud():
+    """Upload current database to cloud"""
+    result = cloud_backup.upload_backup_to_cloud()
     if result['success']:
         return jsonify(result)
     return jsonify(result), 400
 
-@app.route('/api/drive-backups/restore/<file_id>', methods=['POST'])
-def restore_from_drive(file_id):
-    """Restore database from a Google Drive backup"""
-    access_token = request.headers.get('Authorization', '').replace('Bearer ', '')
-    if not access_token:
-        return jsonify({'error': 'Missing access token'}), 401
-
-    result = drive_backup.restore_from_drive(access_token, file_id)
+@app.route('/api/cloud-backups/restore', methods=['POST'])
+def restore_from_cloud():
+    """Restore database from a cloud backup"""
+    data = request.get_json()
+    file_path = data.get('path')
+    if not file_path:
+        return jsonify({'success': False, 'error': 'File path required'}), 400
+    result = cloud_backup.restore_from_cloud(file_path)
     if result['success']:
         return jsonify(result)
     return jsonify(result), 400
 
-@app.route('/api/drive-backups/<file_id>', methods=['DELETE'])
-def delete_from_drive(file_id):
-    """Delete a backup from Google Drive"""
-    access_token = request.headers.get('Authorization', '').replace('Bearer ', '')
-    if not access_token:
-        return jsonify({'error': 'Missing access token'}), 401
-
-    result = drive_backup.delete_drive_backup(access_token, file_id)
+@app.route('/api/cloud-backups/delete', methods=['POST'])
+def delete_from_cloud():
+    """Delete a backup from cloud"""
+    data = request.get_json()
+    file_path = data.get('path')
+    if not file_path:
+        return jsonify({'success': False, 'error': 'File path required'}), 400
+    result = cloud_backup.delete_cloud_backup(file_path)
     if result['success']:
         return jsonify(result)
     return jsonify(result), 400
+
+@app.route('/api/cloud-backups/status', methods=['GET'])
+def get_cloud_status():
+    """Check if cloud backup is configured"""
+    is_configured = cloud_backup.is_cloud_configured()
+    return jsonify({
+        'configured': is_configured,
+        'message': 'Cloud backup is ready' if is_configured else 'Cloud backup not configured. Set JSONBIN_API_KEY environment variable.'
+    })
 
 # ============================================
 # Main
