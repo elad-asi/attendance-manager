@@ -16,7 +16,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '0.6.9'
+BE_VERSION = '0.6.10'
 
 # NOTE: Active users are now tracked in SQLite database (see database.py)
 # This allows multi-worker deployments (like Gunicorn) to share state
@@ -462,6 +462,15 @@ def health_check():
 def get_version():
     """Get backend version"""
     return jsonify({'version': BE_VERSION})
+
+@app.route('/api/migrate', methods=['POST'])
+def run_migration():
+    """Run database migrations to add new tables"""
+    try:
+        db.ensure_active_users_table()
+        return jsonify({'success': True, 'message': 'Migration completed'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # ============================================
 # Active Users Tracking (Database-backed for multi-worker support)

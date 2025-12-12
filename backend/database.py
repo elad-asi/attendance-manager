@@ -350,6 +350,24 @@ def delete_sheet(sheet_id):
 
 ACTIVE_USER_TIMEOUT_SECONDS = 30  # Consider user inactive after 30 seconds
 
+def ensure_active_users_table():
+    """Ensure the active_users table exists (migration helper)"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS active_users (
+            session_id TEXT PRIMARY KEY,
+            email TEXT DEFAULT 'Anonymous',
+            sheet_id INTEGER NOT NULL,
+            last_seen REAL NOT NULL,
+            FOREIGN KEY (sheet_id) REFERENCES sheets(id) ON DELETE CASCADE
+        )
+    ''')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_active_users_sheet ON active_users(sheet_id)')
+    conn.commit()
+    conn.close()
+    print("active_users table ensured")
+
 def update_active_user(session_id, email, sheet_id, last_seen):
     """Update or insert an active user session"""
     conn = get_db_connection()
@@ -405,3 +423,5 @@ def get_all_active_users_for_sheet(sheet_id):
 
 # Initialize database when module is imported
 init_database()
+# Ensure active_users table exists (migration for existing databases)
+ensure_active_users_table()
