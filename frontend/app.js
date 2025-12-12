@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.4.3';
+const FE_VERSION = '0.5.0';
 
 // API Base URL
 const API_BASE = '/api';
@@ -1846,7 +1846,11 @@ async function loadCloudBackupList() {
             return;
         }
 
-        const response = await fetch(`${API_BASE}/cloud-backups`);
+        // Filter by current sheet if one is selected
+        const url = currentSheetId
+            ? `${API_BASE}/cloud-backups?sheet_id=${currentSheetId}`
+            : `${API_BASE}/cloud-backups`;
+        const response = await fetch(url);
         const data = await response.json();
 
         if (!data.success && data.error) {

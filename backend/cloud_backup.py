@@ -172,6 +172,26 @@ def _save_backup_index(index):
     _save_cloud_index(index)
 
 
+def _get_sheets_info():
+    """Get list of sheets from the database"""
+    import sqlite3
+    sheets = []
+    try:
+        conn = sqlite3.connect(DATABASE_FILE)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute('SELECT id, name FROM sheets')
+        for row in cursor.fetchall():
+            sheets.append({
+                'id': row['id'],
+                'name': row['name']
+            })
+        conn.close()
+    except:
+        pass
+    return sheets
+
+
 def upload_backup_to_cloud():
     """Upload current database to JSONBin as base64-encoded JSON"""
     if not os.path.exists(DATABASE_FILE):
@@ -182,6 +202,9 @@ def upload_backup_to_cloud():
         return {'success': False, 'error': 'Cloud backup not configured. Set JSONBIN_API_KEY.'}
 
     try:
+        # Get sheets info before backup
+        sheets_info = _get_sheets_info()
+
         # Read and compress database file
         with open(DATABASE_FILE, 'rb') as f:
             db_content = f.read()
@@ -198,6 +221,7 @@ def upload_backup_to_cloud():
             'timestamp': datetime.now().isoformat(),
             'size': len(db_content),
             'compressed': True,
+            'sheets': sheets_info,  # Include sheets info in backup
             'data': base64.b64encode(compressed).decode('utf-8')
         }
 
@@ -221,7 +245,8 @@ def upload_backup_to_cloud():
                 'id': bin_id,
                 'name': backup_name,
                 'timestamp': backup_data['timestamp'],
-                'size': backup_data['size']
+                'size': backup_data['size'],
+                'sheets': sheets_info  # Include sheets info in index
             })
             _save_backup_index(index)
 
@@ -244,8 +269,12 @@ def upload_backup_to_cloud():
         return {'success': False, 'error': str(e)}
 
 
-def list_cloud_backups():
-    """List all backups from the cloud index"""
+def list_cloud_backups(filter_sheet_id=None):
+    """List backups from the cloud index, optionally filtered by sheet_id
+
+    Args:
+        filter_sheet_id: If provided, only return backups that contain this sheet_id
+    """
     api_key = get_api_key()
     if not api_key:
         return {'success': False, 'error': 'Cloud backup not configured', 'backups': []}
@@ -256,12 +285,21 @@ def list_cloud_backups():
         backups = []
 
         for backup in index.get('backups', []):
+            # Filter by sheet_id if provided
+            if filter_sheet_id is not None:
+                backup_sheets = backup.get('sheets', [])
+                # Check if this backup contains the requested sheet
+                sheet_ids = [s.get('id') for s in backup_sheets]
+                if filter_sheet_id not in sheet_ids:
+                    continue  # Skip backups that don't include this sheet
+
             backups.append({
                 'id': backup['id'],
                 'filename': backup['name'],
                 'path': backup['id'],  # Use ID as path for consistency
                 'timestamp': backup['timestamp'],
                 'size': backup.get('size', 0),
+                'sheets': backup.get('sheets', []),  # Include sheets info
                 'source': 'cloud'
             })
 

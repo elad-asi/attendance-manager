@@ -14,7 +14,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '0.4.5'
+BE_VERSION = '0.5.0'
 
 # Configuration
 GOOGLE_CLIENT_ID = '651831609522-bvrgmop9hmdghlrn2tqm1hv0dmkhu933.apps.googleusercontent.com'
@@ -587,8 +587,10 @@ def restore_backup_api(filename):
 
 @app.route('/api/cloud-backups', methods=['GET'])
 def list_cloud_backups():
-    """List all backups from cloud"""
-    result = cloud_backup.list_cloud_backups()
+    """List backups from cloud, optionally filtered by sheet_id"""
+    # Get optional sheet_id filter from query params
+    sheet_id = request.args.get('sheet_id', type=int)
+    result = cloud_backup.list_cloud_backups(filter_sheet_id=sheet_id)
     return jsonify(result)
 
 @app.route('/api/cloud-backups/upload', methods=['POST'])
