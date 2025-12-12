@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.6.0';
+const FE_VERSION = '0.6.1';
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 10000; // 10 seconds
@@ -1941,10 +1941,12 @@ async function loadCloudBackupList() {
             return;
         }
 
-        // Filter by current sheet if one is selected
-        const url = currentSheetId
-            ? `${API_BASE}/cloud-backups?sheet_id=${currentSheetId}`
-            : `${API_BASE}/cloud-backups`;
+        // Filter by current sheet/spreadsheet - spreadsheet_id is critical for cross-machine sync
+        let url = `${API_BASE}/cloud-backups`;
+        const params = [];
+        if (currentSheetId) params.push(`sheet_id=${currentSheetId}`);
+        if (currentSpreadsheetId) params.push(`spreadsheet_id=${currentSpreadsheetId}`);
+        if (params.length > 0) url += '?' + params.join('&');
         const response = await fetch(url);
         const data = await response.json();
 
