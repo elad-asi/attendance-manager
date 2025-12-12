@@ -2,6 +2,8 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import json
 import os
+import threading
+import time
 from datetime import datetime
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
@@ -14,7 +16,11 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '0.5.1'
+BE_VERSION = '0.5.2'
+
+# Auto-backup configuration
+AUTO_BACKUP_INTERVAL_SECONDS = 60 * 60  # 1 hour
+auto_backup_thread = None
 
 # Configuration
 GOOGLE_CLIENT_ID = '651831609522-bvrgmop9hmdghlrn2tqm1hv0dmkhu933.apps.googleusercontent.com'
@@ -648,6 +654,41 @@ def compare_with_cloud_backup():
     return jsonify(result), 400
 
 # ============================================
+# Auto-backup Background Thread
+# ============================================
+
+def auto_backup_worker():
+    """Background thread that performs hourly backups if data has changed"""
+    print("Auto-backup: Background worker started")
+    while True:
+        time.sleep(AUTO_BACKUP_INTERVAL_SECONDS)
+        try:
+            if cloud_backup.is_cloud_configured():
+                print("Auto-backup: Running hourly backup check...")
+                result = cloud_backup.upload_backup_to_cloud()
+                if result.get('success'):
+                    if result.get('skipped'):
+                        print("Auto-backup: Skipped - no changes since last backup")
+                    else:
+                        print(f"Auto-backup: Backup created successfully")
+                else:
+                    print(f"Auto-backup: Failed - {result.get('error')}")
+            else:
+                print("Auto-backup: Cloud not configured, skipping")
+        except Exception as e:
+            print(f"Auto-backup: Error - {e}")
+
+
+def start_auto_backup():
+    """Start the auto-backup background thread"""
+    global auto_backup_thread
+    if auto_backup_thread is None or not auto_backup_thread.is_alive():
+        auto_backup_thread = threading.Thread(target=auto_backup_worker, daemon=True)
+        auto_backup_thread.start()
+        print("Auto-backup: Scheduled every hour")
+
+
+# ============================================
 # Main
 # ============================================
 
@@ -656,4 +697,9 @@ if __name__ == '__main__':
     debug = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     print("Starting Attendance Manager Backend...")
     print(f"Server running on port {port}")
+
+    # Start auto-backup in background (only in production or when not in reloader)
+    if not debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+        start_auto_backup()
+
     app.run(host='0.0.0.0', port=port, debug=debug)

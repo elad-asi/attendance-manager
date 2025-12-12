@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.5.1';
+const FE_VERSION = '0.5.2';
 
 // API Base URL
 const API_BASE = '/api';
@@ -1815,57 +1815,6 @@ async function restoreBackup() {
 // ============================================
 
 let cloudConfigured = false;
-let autoBackupInterval = null;
-const AUTO_BACKUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour in milliseconds
-
-async function autoBackupToCloud() {
-    if (!cloudConfigured || !currentSheetId) {
-        return;
-    }
-
-    try {
-        console.log('Auto-backup: Starting hourly cloud backup...');
-        const response = await fetch(`${API_BASE}/cloud-backups/upload`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        const data = await response.json();
-
-        if (data.success) {
-            if (data.skipped) {
-                console.log('Auto-backup: Skipped - no changes since last backup');
-            } else {
-                console.log('Auto-backup: Cloud backup completed successfully');
-                showSaveToast('גיבוי אוטומטי לענן בוצע');
-            }
-        } else {
-            console.error('Auto-backup failed:', data.error);
-        }
-    } catch (error) {
-        console.error('Auto-backup error:', error);
-    }
-}
-
-function startAutoBackup() {
-    if (autoBackupInterval) {
-        clearInterval(autoBackupInterval);
-    }
-    autoBackupInterval = setInterval(autoBackupToCloud, AUTO_BACKUP_INTERVAL_MS);
-    console.log('Auto-backup: Scheduled every hour');
-}
-
-async function checkCloudStatus() {
-    try {
-        const response = await fetch(`${API_BASE}/cloud-backups/status`);
-        const data = await response.json();
-        cloudConfigured = data.configured;
-        return cloudConfigured;
-    } catch (error) {
-        console.error('Error checking cloud status:', error);
-        cloudConfigured = false;
-        return false;
-    }
-}
 
 async function loadCloudBackupList() {
     const cloudBackupList = document.getElementById('driveBackupList');
@@ -2164,13 +2113,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Load data from backend
     loadFromBackend();
-
-    // Check cloud status and start auto-backup
-    checkCloudStatus().then(configured => {
-        if (configured) {
-            startAutoBackup();
-        }
-    });
 
     // Google Connect/Disconnect button (single button that changes state)
     document.getElementById('googleConnectBtn').addEventListener('click', handleGoogleConnectClick);
