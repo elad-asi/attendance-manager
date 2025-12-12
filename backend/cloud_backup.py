@@ -311,6 +311,24 @@ def _load_backup_index_for_spreadsheet(spreadsheet_id):
     return {'backups': [], 'spreadsheet_id': spreadsheet_id}
 
 
+def _load_cloud_index_direct(index_bin_id):
+    """Load a cloud index directly by bin ID (for use when spreadsheet_id is unknown)"""
+    try:
+        headers = _get_headers()
+        response = requests.get(
+            f'{JSONBIN_API_URL}/b/{index_bin_id}/latest',
+            headers=headers
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            return result.get('record', {'backups': []})
+        else:
+            return {'backups': []}
+    except:
+        return {'backups': []}
+
+
 def _save_backup_index_for_spreadsheet(spreadsheet_id, index):
     """Save the backup index for a specific spreadsheet to cloud"""
     index['spreadsheet_id'] = spreadsheet_id
@@ -579,7 +597,13 @@ def list_cloud_backups(filter_sheet_id=None, spreadsheet_id=None):
         if spreadsheet_id:
             index = _load_backup_index_for_spreadsheet(spreadsheet_id)
         else:
-            index = _load_backup_index()
+            # If no spreadsheet_id but JSONBIN_INDEX_BIN_ID env var exists, use it directly
+            # This enables Render to list backups even without knowing the spreadsheet_id
+            direct_index_bin_id = os.environ.get('JSONBIN_INDEX_BIN_ID')
+            if direct_index_bin_id:
+                index = _load_cloud_index_direct(direct_index_bin_id)
+            else:
+                index = _load_backup_index()
 
         backups = []
 
