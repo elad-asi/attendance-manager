@@ -601,15 +601,16 @@ def list_cloud_backups(filter_sheet_id=None, spreadsheet_id=None):
         return {'success': False, 'error': 'Cloud backup not configured', 'backups': []}
 
     try:
-        # Load index - if spreadsheet_id provided, use it; otherwise load for all spreadsheets
-        if spreadsheet_id:
-            index = _load_backup_index_for_spreadsheet(spreadsheet_id)
+        # ALWAYS use hardcoded index bin ID first for cross-machine sync
+        # This ensures backups created on one machine are visible on all machines
+        direct_index_bin_id = os.environ.get('JSONBIN_INDEX_BIN_ID') or HARDCODED_INDEX_BIN_ID
+        if direct_index_bin_id:
+            print(f"Using index bin ID: {direct_index_bin_id[:8]}...")
+            index = _load_cloud_index_direct(direct_index_bin_id)
         else:
-            # Try env var first, then hardcoded fallback, then local index
-            direct_index_bin_id = os.environ.get('JSONBIN_INDEX_BIN_ID') or HARDCODED_INDEX_BIN_ID
-            if direct_index_bin_id:
-                print(f"Using index bin ID: {direct_index_bin_id[:8]}...")
-                index = _load_cloud_index_direct(direct_index_bin_id)
+            # Fallback to spreadsheet-specific or local index
+            if spreadsheet_id:
+                index = _load_backup_index_for_spreadsheet(spreadsheet_id)
             else:
                 index = _load_backup_index()
 
