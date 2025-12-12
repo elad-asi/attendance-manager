@@ -181,6 +181,12 @@ async function loadBackendVersion() {
 // ============================================
 
 function updateSheetUI() {
+    // Update sheet ID display
+    const sheetIdDisplay = document.getElementById('sheetIdDisplay');
+    if (sheetIdDisplay) {
+        sheetIdDisplay.textContent = `Sheet: ${currentSheetId || '-'}`;
+    }
+
     // Start or stop polling based on whether we have an active sheet
     if (currentSheetId) {
         startPolling();
