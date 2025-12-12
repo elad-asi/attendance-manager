@@ -3,15 +3,29 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.6.7';
+const FE_VERSION = '0.6.8';
 
 // Auto-polling configuration
-const POLL_INTERVAL_MS = 10000; // 10 seconds
+const POLL_INTERVAL_MS = 3000; // 3 seconds
 let pollIntervalId = null;
 let currentUserEmail = null;
 
-// API Base URL
-const API_BASE = '/api';
+// Unique session ID for this browser tab (allows same user on multiple machines)
+const SESSION_ID = generateSessionId();
+
+function generateSessionId() {
+    // Check if we already have a session ID for this tab
+    let sessionId = sessionStorage.getItem('attendanceSessionId');
+    if (!sessionId) {
+        // Generate a new random session ID
+        sessionId = 'sess_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
+        sessionStorage.setItem('attendanceSessionId', sessionId);
+    }
+    return sessionId;
+}
+
+// API Base URL - Use Render server for multi-user testing
+const API_BASE = 'https://attendance-manager-slzl.onrender.com/api';
 
 // State management
 let teamMembers = [];
@@ -214,7 +228,8 @@ async function pollForUpdates() {
 
     try {
         const response = await apiPost(`/sheets/${currentSheetId}/heartbeat`, {
-            email: currentUserEmail || 'Anonymous'
+            email: currentUserEmail || 'Anonymous',
+            sessionId: SESSION_ID
         });
 
         if (response.error) {
@@ -640,7 +655,8 @@ let pendingSheetData = null;
 let currentColumnMapping = {};
 
 // Skipped columns state (columns user chose to hide via toggle button)
-let skippedColumns = [];
+// Default: hide miktzoaTzvai (מקצוע צבאי)
+let skippedColumns = ['miktzoaTzvai'];
 
 // Permanently skipped columns (columns user chose to skip during mapping - no data loaded)
 let permanentlySkippedColumns = [];

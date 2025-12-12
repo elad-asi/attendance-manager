@@ -16,9 +16,10 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '0.6.7'
+BE_VERSION = '0.6.8'
 
-# Active users tracking (email -> {sheet_id, last_seen})
+# Active users tracking (session_id -> {email, sheet_id, last_seen})
+# Using session_id allows same user from multiple devices
 active_users = {}
 ACTIVE_USER_TIMEOUT_SECONDS = 30  # Consider user inactive after 30 seconds
 
@@ -473,7 +474,7 @@ def cleanup_inactive_users():
     global active_users
     now = time.time()
     active_users = {
-        email: data for email, data in active_users.items()
+        session_id: data for session_id, data in active_users.items()
         if now - data['last_seen'] < ACTIVE_USER_TIMEOUT_SECONDS
     }
 
@@ -482,9 +483,11 @@ def heartbeat(sheet_id):
     """Register user activity on a sheet and return current data + active users"""
     req = request.json or {}
     user_email = req.get('email', 'Anonymous')
+    session_id = req.get('sessionId', 'unknown')
 
-    # Update active users
-    active_users[user_email] = {
+    # Update active users - keyed by session_id to allow same user on multiple machines
+    active_users[session_id] = {
+        'email': user_email,
         'sheet_id': sheet_id,
         'last_seen': time.time()
     }
@@ -492,10 +495,10 @@ def heartbeat(sheet_id):
     # Cleanup inactive users
     cleanup_inactive_users()
 
-    # Get list of other active users on this sheet
+    # Get list of other active users on this sheet (exclude current session)
     other_users = [
-        email for email, data in active_users.items()
-        if data['sheet_id'] == sheet_id and email != user_email
+        data['email'] for sid, data in active_users.items()
+        if data['sheet_id'] == sheet_id and sid != session_id
     ]
 
     # Get current data from database
@@ -520,7 +523,7 @@ def get_active_users(sheet_id):
     cleanup_inactive_users()
 
     users_on_sheet = [
-        email for email, data in active_users.items()
+        data['email'] for session_id, data in active_users.items()
         if data['sheet_id'] == sheet_id
     ]
 
