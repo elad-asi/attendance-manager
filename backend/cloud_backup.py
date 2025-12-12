@@ -151,28 +151,55 @@ def upload_backup_to_cloud():
 
 
 def list_cloud_backups():
-    """List all backups from local index"""
+    """List all backups from JSONBin.io API"""
     api_key = get_api_key()
     if not api_key:
         return {'success': False, 'error': 'Cloud backup not configured', 'backups': []}
 
     try:
-        index = _load_backup_index()
-        backups = []
+        headers = _get_headers()
 
-        for backup in index.get('backups', []):
-            backups.append({
-                'id': backup['id'],
-                'filename': backup['name'],
-                'path': backup['id'],  # Use ID as path for consistency
-                'timestamp': backup['timestamp'],
-                'size': backup['size'],
-                'source': 'cloud'
-            })
+        # Fetch bins from JSONBin API
+        response = requests.get(
+            f'{JSONBIN_API_URL}/c/uncategorized/bins',
+            headers=headers
+        )
 
-        # Sort by timestamp descending
-        backups.sort(key=lambda x: x['timestamp'], reverse=True)
-        return {'success': True, 'backups': backups}
+        if response.status_code == 200:
+            bins = response.json()
+            backups = []
+
+            for bin_info in bins:
+                # Filter for attendance backups by name pattern
+                bin_name = bin_info.get('snippetMeta', {}).get('name', '')
+                if bin_name.startswith('attendance_backup_'):
+                    bin_id = bin_info.get('record', '')
+                    created_at = bin_info.get('createdAt', '')
+
+                    backups.append({
+                        'id': bin_id,
+                        'filename': bin_name,
+                        'path': bin_id,
+                        'timestamp': created_at,
+                        'size': 0,  # Size not available in list API
+                        'source': 'cloud'
+                    })
+
+            # Sort by timestamp descending
+            backups.sort(key=lambda x: x['timestamp'], reverse=True)
+
+            # Also update local index for faster access next time
+            if backups:
+                index = {'backups': [{'id': b['id'], 'name': b['filename'], 'timestamp': b['timestamp'], 'size': b['size']} for b in backups]}
+                _save_backup_index(index)
+
+            return {'success': True, 'backups': backups}
+        else:
+            try:
+                error_msg = response.json().get('message', response.text)
+            except:
+                error_msg = f'HTTP {response.status_code}: {response.text}'
+            return {'success': False, 'error': error_msg, 'backups': []}
 
     except Exception as e:
         return {'success': False, 'error': str(e), 'backups': []}
