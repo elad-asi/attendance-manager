@@ -36,6 +36,13 @@ LEGACY_INDEX_BIN_ID_FILE = os.path.join(SCRIPT_DIR, 'data/cloud_index_bin_id.txt
 # Maximum number of backups to keep in cloud
 MAX_CLOUD_BACKUPS = 5
 
+# Hardcoded fallback index bin ID for cross-machine sync
+# This is used when no local cache exists and no env var is set
+HARDCODED_INDEX_BIN_ID = '693bbf3a43b1c97be9e89bd6'
+
+# Hardcoded API key for JSONBin.io (fallback if env var not set)
+HARDCODED_API_KEY = '$2a$10$iqgBfLNqJIrlht8mI8U8UOZoq.gWomu0j.T/Li03aYLdqBy9FWs6a'
+
 
 def _compute_db_hash():
     """Compute SHA256 hash of the database file content"""
@@ -61,7 +68,8 @@ def get_api_key():
         except Exception as e:
             print(f"Error loading cloud token: {e}")
 
-    return None
+    # Fallback to hardcoded API key
+    return HARDCODED_API_KEY
 
 
 def save_api_key(api_key):
@@ -597,10 +605,10 @@ def list_cloud_backups(filter_sheet_id=None, spreadsheet_id=None):
         if spreadsheet_id:
             index = _load_backup_index_for_spreadsheet(spreadsheet_id)
         else:
-            # If no spreadsheet_id but JSONBIN_INDEX_BIN_ID env var exists, use it directly
-            # This enables Render to list backups even without knowing the spreadsheet_id
-            direct_index_bin_id = os.environ.get('JSONBIN_INDEX_BIN_ID')
+            # Try env var first, then hardcoded fallback, then local index
+            direct_index_bin_id = os.environ.get('JSONBIN_INDEX_BIN_ID') or HARDCODED_INDEX_BIN_ID
             if direct_index_bin_id:
+                print(f"Using index bin ID: {direct_index_bin_id[:8]}...")
                 index = _load_cloud_index_direct(direct_index_bin_id)
             else:
                 index = _load_backup_index()

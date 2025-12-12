@@ -16,7 +16,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '0.6.3'
+BE_VERSION = '0.6.4'
 
 # Active users tracking (email -> {sheet_id, last_seen})
 active_users = {}
