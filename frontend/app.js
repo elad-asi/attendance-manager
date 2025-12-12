@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.6.1';
+const FE_VERSION = '0.6.2';
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 10000; // 10 seconds

@@ -200,6 +200,16 @@ def _get_index_bin_id_for_spreadsheet(spreadsheet_id):
     if spreadsheet_id in cache:
         return cache[spreadsheet_id]
 
+    # Check for direct index bin ID from environment variable (for cross-machine sync)
+    # This allows Render to directly access the index bin without needing the master index
+    direct_index_bin_id = os.environ.get('JSONBIN_INDEX_BIN_ID')
+    if direct_index_bin_id:
+        print(f"Using direct index bin ID from env: {direct_index_bin_id[:8]}...")
+        # Cache it locally
+        cache[spreadsheet_id] = direct_index_bin_id
+        _save_index_bin_cache(cache)
+        return direct_index_bin_id
+
     # Load from master index in cloud
     master_index = _load_master_index()
     index_bin_id = master_index.get('spreadsheets', {}).get(spreadsheet_id)
