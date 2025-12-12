@@ -8,6 +8,7 @@ import os
 import json
 import base64
 import zlib
+import hashlib
 import requests
 from datetime import datetime
 
@@ -22,6 +23,17 @@ JSONBIN_API_URL = 'https://api.jsonbin.io/v3'
 # Master index bin ID (stores list of all backup bin IDs)
 # Set JSONBIN_INDEX_ID env var or it will be created on first upload
 INDEX_BIN_ID_FILE = 'data/cloud_index_bin_id.txt'
+
+# Maximum number of backups to keep in cloud
+MAX_CLOUD_BACKUPS = 5
+
+
+def _compute_db_hash():
+    """Compute SHA256 hash of the database file content"""
+    if not os.path.exists(DATABASE_FILE):
+        return None
+    with open(DATABASE_FILE, 'rb') as f:
+        return hashlib.sha256(f.read()).hexdigest()
 
 
 def get_api_key():
@@ -172,6 +184,57 @@ def _save_backup_index(index):
     _save_cloud_index(index)
 
 
+def _cleanup_old_backups(index):
+    """Keep only one backup per day and max 5 days total.
+    Deletes older backups from JSONBin to save space.
+    """
+    backups = index.get('backups', [])
+    if not backups:
+        return index
+
+    # Sort by timestamp descending (newest first)
+    backups.sort(key=lambda x: x['timestamp'], reverse=True)
+
+    # Group backups by date (YYYY-MM-DD)
+    by_date = {}
+    for backup in backups:
+        date = backup['timestamp'][:10]  # Extract YYYY-MM-DD from ISO timestamp
+        if date not in by_date:
+            by_date[date] = []
+        by_date[date].append(backup)
+
+    # Keep only the latest backup per day
+    backups_to_keep = []
+    backups_to_delete = []
+
+    for date in sorted(by_date.keys(), reverse=True):  # Most recent dates first
+        day_backups = by_date[date]
+        # Keep the newest backup for this day
+        backups_to_keep.append(day_backups[0])
+        # Mark older backups from the same day for deletion
+        backups_to_delete.extend(day_backups[1:])
+
+    # Keep only 5 most recent days
+    if len(backups_to_keep) > MAX_CLOUD_BACKUPS:
+        backups_to_delete.extend(backups_to_keep[MAX_CLOUD_BACKUPS:])
+        backups_to_keep = backups_to_keep[:MAX_CLOUD_BACKUPS]
+
+    # Delete old backups from JSONBin
+    headers = _get_headers()
+    for backup in backups_to_delete:
+        try:
+            requests.delete(
+                f'{JSONBIN_API_URL}/b/{backup["id"]}',
+                headers=headers
+            )
+            print(f"Deleted old backup: {backup['name']}")
+        except Exception as e:
+            print(f"Failed to delete backup {backup['id']}: {e}")
+
+    index['backups'] = backups_to_keep
+    return index
+
+
 def _get_sheets_info():
     """Get list of sheets from the database"""
     import sqlite3
@@ -193,7 +256,9 @@ def _get_sheets_info():
 
 
 def upload_backup_to_cloud():
-    """Upload current database to JSONBin as base64-encoded JSON"""
+    """Upload current database to JSONBin as base64-encoded JSON.
+    Skips upload if data hasn't changed since last backup.
+    """
     if not os.path.exists(DATABASE_FILE):
         return {'success': False, 'error': 'Database file not found'}
 
@@ -202,6 +267,21 @@ def upload_backup_to_cloud():
         return {'success': False, 'error': 'Cloud backup not configured. Set JSONBIN_API_KEY.'}
 
     try:
+        # Compute hash of current database
+        current_hash = _compute_db_hash()
+
+        # Check if data has changed since last backup
+        index = _load_backup_index()
+        if index.get('backups'):
+            last_backup = max(index['backups'], key=lambda x: x['timestamp'])
+            if last_backup.get('hash') == current_hash:
+                print('Backup skipped: data unchanged since last backup')
+                return {
+                    'success': True,
+                    'skipped': True,
+                    'message': 'No changes since last backup'
+                }
+
         # Get sheets info before backup
         sheets_info = _get_sheets_info()
 
@@ -246,8 +326,12 @@ def upload_backup_to_cloud():
                 'name': backup_name,
                 'timestamp': backup_data['timestamp'],
                 'size': backup_data['size'],
-                'sheets': sheets_info  # Include sheets info in index
+                'sheets': sheets_info,  # Include sheets info in index
+                'hash': current_hash  # Store hash for duplicate detection
             })
+
+            # Cleanup: Keep only the latest backup per day, max 5 days
+            index = _cleanup_old_backups(index)
             _save_backup_index(index)
 
             return {
