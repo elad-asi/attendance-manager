@@ -12,17 +12,26 @@ import hashlib
 import requests
 from datetime import datetime
 
-# Configuration
-DATABASE_FILE = 'data/attendance.db'
-TOKEN_FILE = 'data/cloud_token.json'
-INDEX_FILE = 'data/cloud_index.json'
+# Get the directory where this script is located
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Configuration (paths relative to script directory)
+DATABASE_FILE = os.path.join(SCRIPT_DIR, 'data/attendance.db')
+TOKEN_FILE = os.path.join(SCRIPT_DIR, 'data/cloud_token.json')
+INDEX_FILE = os.path.join(SCRIPT_DIR, 'data/cloud_index.json')
 
 # JSONBin.io API
 JSONBIN_API_URL = 'https://api.jsonbin.io/v3'
 
-# Master index bin ID (stores list of all backup bin IDs)
-# Set JSONBIN_INDEX_ID env var or it will be created on first upload
-INDEX_BIN_ID_FILE = 'data/cloud_index_bin_id.txt'
+# Global master index bin ID - maps spreadsheet_id to index_bin_id
+# This must be shared across all machines (set via JSONBIN_MASTER_INDEX_ID env var)
+MASTER_INDEX_BIN_ID_FILE = os.path.join(SCRIPT_DIR, 'data/master_index_bin_id.txt')
+
+# Local cache of spreadsheet-specific index bin IDs
+INDEX_BIN_CACHE_FILE = os.path.join(SCRIPT_DIR, 'data/index_bin_cache.json')
+
+# Legacy: old index bin ID file (for backwards compatibility)
+LEGACY_INDEX_BIN_ID_FILE = os.path.join(SCRIPT_DIR, 'data/cloud_index_bin_id.txt')
 
 # Maximum number of backups to keep in cloud
 MAX_CLOUD_BACKUPS = 5
@@ -76,17 +85,17 @@ def _get_headers():
     }
 
 
-def _get_index_bin_id():
-    """Get the master index bin ID from env or file"""
-    # Try environment variable first
-    bin_id = os.environ.get('JSONBIN_INDEX_ID')
+def _get_master_index_bin_id():
+    """Get the global master index bin ID from env or file"""
+    # Try environment variable first (required for cross-machine sync)
+    bin_id = os.environ.get('JSONBIN_MASTER_INDEX_ID')
     if bin_id:
         return bin_id
 
-    # Try loading from file
-    if os.path.exists(INDEX_BIN_ID_FILE):
+    # Try loading from file (local fallback)
+    if os.path.exists(MASTER_INDEX_BIN_ID_FILE):
         try:
-            with open(INDEX_BIN_ID_FILE, 'r') as f:
+            with open(MASTER_INDEX_BIN_ID_FILE, 'r') as f:
                 return f.read().strip()
         except:
             pass
@@ -94,18 +103,143 @@ def _get_index_bin_id():
     return None
 
 
-def _save_index_bin_id(bin_id):
-    """Save the index bin ID to file"""
-    os.makedirs(os.path.dirname(INDEX_BIN_ID_FILE), exist_ok=True)
-    with open(INDEX_BIN_ID_FILE, 'w') as f:
+def _save_master_index_bin_id(bin_id):
+    """Save the master index bin ID to file"""
+    os.makedirs(os.path.dirname(MASTER_INDEX_BIN_ID_FILE), exist_ok=True)
+    with open(MASTER_INDEX_BIN_ID_FILE, 'w') as f:
         f.write(bin_id)
 
 
-def _load_cloud_index():
-    """Load the backup index from JSONBin"""
-    index_bin_id = _get_index_bin_id()
+def _load_index_bin_cache():
+    """Load local cache of spreadsheet_id -> index_bin_id mappings"""
+    if os.path.exists(INDEX_BIN_CACHE_FILE):
+        try:
+            with open(INDEX_BIN_CACHE_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            pass
+    return {}
+
+
+def _save_index_bin_cache(cache):
+    """Save local cache of spreadsheet_id -> index_bin_id mappings"""
+    os.makedirs(os.path.dirname(INDEX_BIN_CACHE_FILE), exist_ok=True)
+    with open(INDEX_BIN_CACHE_FILE, 'w') as f:
+        json.dump(cache, f, indent=2)
+
+
+def _load_master_index():
+    """Load the global master index from JSONBin (maps spreadsheet_id -> index_bin_id)"""
+    master_bin_id = _get_master_index_bin_id()
+    if not master_bin_id:
+        return {'spreadsheets': {}}
+
+    try:
+        headers = _get_headers()
+        response = requests.get(
+            f'{JSONBIN_API_URL}/b/{master_bin_id}/latest',
+            headers=headers
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            return result.get('record', {'spreadsheets': {}})
+        else:
+            return {'spreadsheets': {}}
+    except:
+        return {'spreadsheets': {}}
+
+
+def _save_master_index(master_index):
+    """Save the global master index to JSONBin"""
+    headers = _get_headers()
+    master_bin_id = _get_master_index_bin_id()
+
+    if master_bin_id:
+        # Update existing master index bin
+        response = requests.put(
+            f'{JSONBIN_API_URL}/b/{master_bin_id}',
+            headers=headers,
+            json=master_index
+        )
+        return response.status_code == 200
+    else:
+        # Create new master index bin
+        headers['X-Bin-Name'] = 'attendance_master_index'
+        response = requests.post(
+            f'{JSONBIN_API_URL}/b',
+            headers=headers,
+            json=master_index
+        )
+        if response.status_code in [200, 201]:
+            result = response.json()
+            new_bin_id = result.get('metadata', {}).get('id')
+            if new_bin_id:
+                _save_master_index_bin_id(new_bin_id)
+                print(f"Created new master index bin: {new_bin_id}")
+                print(f"IMPORTANT: Set JSONBIN_MASTER_INDEX_ID={new_bin_id} on all machines!")
+                return True
+        return False
+
+
+def _get_legacy_index_bin_id():
+    """Get the legacy index bin ID from old file (backwards compatibility)"""
+    if os.path.exists(LEGACY_INDEX_BIN_ID_FILE):
+        try:
+            with open(LEGACY_INDEX_BIN_ID_FILE, 'r') as f:
+                return f.read().strip()
+        except:
+            pass
+    return None
+
+
+def _get_index_bin_id_for_spreadsheet(spreadsheet_id):
+    """Get the index bin ID for a specific spreadsheet_id from master index"""
+    # First check local cache
+    cache = _load_index_bin_cache()
+    if spreadsheet_id in cache:
+        return cache[spreadsheet_id]
+
+    # Load from master index in cloud
+    master_index = _load_master_index()
+    index_bin_id = master_index.get('spreadsheets', {}).get(spreadsheet_id)
+
+    # If not found in master index, try legacy index (backwards compatibility)
     if not index_bin_id:
-        return {'backups': []}
+        legacy_id = _get_legacy_index_bin_id()
+        if legacy_id:
+            # Use legacy index for this spreadsheet
+            index_bin_id = legacy_id
+            # Cache it locally
+            cache[spreadsheet_id] = index_bin_id
+            _save_index_bin_cache(cache)
+            print(f"Using legacy index bin {legacy_id} for spreadsheet {spreadsheet_id[:8]}")
+
+    # Cache locally if found
+    if index_bin_id and spreadsheet_id not in cache:
+        cache[spreadsheet_id] = index_bin_id
+        _save_index_bin_cache(cache)
+
+    return index_bin_id
+
+
+def _register_index_bin_for_spreadsheet(spreadsheet_id, index_bin_id):
+    """Register a new index bin ID for a spreadsheet in the master index"""
+    master_index = _load_master_index()
+    master_index['spreadsheets'][spreadsheet_id] = index_bin_id
+    _save_master_index(master_index)
+
+    # Update local cache
+    cache = _load_index_bin_cache()
+    cache[spreadsheet_id] = index_bin_id
+    _save_index_bin_cache(cache)
+
+
+def _load_cloud_index_for_spreadsheet(spreadsheet_id):
+    """Load the backup index for a specific spreadsheet from JSONBin"""
+    index_bin_id = _get_index_bin_id_for_spreadsheet(spreadsheet_id)
+    if not index_bin_id:
+        return {'backups': [], 'spreadsheet_id': spreadsheet_id}
 
     try:
         headers = _get_headers()
@@ -116,17 +250,19 @@ def _load_cloud_index():
 
         if response.status_code == 200:
             result = response.json()
-            return result.get('record', {'backups': []})
+            index = result.get('record', {'backups': []})
+            index['spreadsheet_id'] = spreadsheet_id
+            return index
         else:
-            return {'backups': []}
+            return {'backups': [], 'spreadsheet_id': spreadsheet_id}
     except:
-        return {'backups': []}
+        return {'backups': [], 'spreadsheet_id': spreadsheet_id}
 
 
-def _save_cloud_index(index):
-    """Save the backup index to JSONBin"""
+def _save_cloud_index_for_spreadsheet(spreadsheet_id, index):
+    """Save the backup index for a specific spreadsheet to JSONBin"""
     headers = _get_headers()
-    index_bin_id = _get_index_bin_id()
+    index_bin_id = _get_index_bin_id_for_spreadsheet(spreadsheet_id)
 
     if index_bin_id:
         # Update existing index bin
@@ -137,8 +273,8 @@ def _save_cloud_index(index):
         )
         return response.status_code == 200
     else:
-        # Create new index bin
-        headers['X-Bin-Name'] = 'attendance_backup_index'
+        # Create new index bin for this spreadsheet
+        headers['X-Bin-Name'] = f'attendance_index_{spreadsheet_id[:8]}'
         response = requests.post(
             f'{JSONBIN_API_URL}/b',
             headers=headers,
@@ -148,44 +284,49 @@ def _save_cloud_index(index):
             result = response.json()
             new_bin_id = result.get('metadata', {}).get('id')
             if new_bin_id:
-                _save_index_bin_id(new_bin_id)
-                print(f"Created new index bin: {new_bin_id}")
-                print(f"Add JSONBIN_INDEX_ID={new_bin_id} to Render environment variables!")
+                # Register this index bin in the master index
+                _register_index_bin_for_spreadsheet(spreadsheet_id, new_bin_id)
+                print(f"Created new index bin for spreadsheet {spreadsheet_id[:8]}: {new_bin_id}")
                 return True
         return False
 
 
-def _load_backup_index():
-    """Load the index of all backups (from cloud or local cache)"""
+def _load_backup_index_for_spreadsheet(spreadsheet_id):
+    """Load the index of backups for a specific spreadsheet (from cloud or local cache)"""
     # Try cloud first
-    cloud_index = _load_cloud_index()
+    cloud_index = _load_cloud_index_for_spreadsheet(spreadsheet_id)
     if cloud_index.get('backups'):
-        # Cache locally
-        _save_backup_index(cloud_index)
         return cloud_index
 
-    # Fall back to local cache
-    if os.path.exists(INDEX_FILE):
-        try:
-            with open(INDEX_FILE, 'r') as f:
-                return json.load(f)
-        except:
-            pass
-    return {'backups': []}
+    return {'backups': [], 'spreadsheet_id': spreadsheet_id}
 
 
-def _save_backup_index(index):
-    """Save the backup index locally and to cloud"""
-    os.makedirs(os.path.dirname(INDEX_FILE), exist_ok=True)
-    with open(INDEX_FILE, 'w') as f:
-        json.dump(index, f, indent=2)
+def _save_backup_index_for_spreadsheet(spreadsheet_id, index):
+    """Save the backup index for a specific spreadsheet to cloud"""
+    index['spreadsheet_id'] = spreadsheet_id
+    _save_cloud_index_for_spreadsheet(spreadsheet_id, index)
 
-    # Also save to cloud
-    _save_cloud_index(index)
+
+def _load_backup_index():
+    """Load the combined index of all backups for all spreadsheets in this database"""
+    spreadsheet_ids = _get_all_spreadsheet_ids()
+    if not spreadsheet_ids:
+        return {'backups': []}
+
+    all_backups = []
+    for spreadsheet_id in spreadsheet_ids:
+        index = _load_backup_index_for_spreadsheet(spreadsheet_id)
+        all_backups.extend(index.get('backups', []))
+
+    # Sort by timestamp descending
+    all_backups.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+    return {'backups': all_backups}
 
 
 def _cleanup_old_backups(index):
-    """Keep only one backup per day and max 5 days total.
+    """Keep backups according to retention policy:
+    - Last 3 backups from today
+    - Last backup from each of the past 5 days (closest to 23:00)
     Deletes older backups from JSONBin to save space.
     """
     backups = index.get('backups', [])
@@ -195,29 +336,57 @@ def _cleanup_old_backups(index):
     # Sort by timestamp descending (newest first)
     backups.sort(key=lambda x: x['timestamp'], reverse=True)
 
-    # Group backups by date (YYYY-MM-DD)
+    # Get today's date
+    today = datetime.now().strftime('%Y-%m-%d')
+
+    # Group backups by date
     by_date = {}
     for backup in backups:
-        date = backup['timestamp'][:10]  # Extract YYYY-MM-DD from ISO timestamp
+        date = backup['timestamp'][:10]  # Extract YYYY-MM-DD
         if date not in by_date:
             by_date[date] = []
         by_date[date].append(backup)
 
-    # Keep only the latest backup per day
     backups_to_keep = []
     backups_to_delete = []
 
-    for date in sorted(by_date.keys(), reverse=True):  # Most recent dates first
-        day_backups = by_date[date]
-        # Keep the newest backup for this day
-        backups_to_keep.append(day_backups[0])
-        # Mark older backups from the same day for deletion
-        backups_to_delete.extend(day_backups[1:])
+    # Get sorted dates (newest first)
+    sorted_dates = sorted(by_date.keys(), reverse=True)
 
-    # Keep only 5 most recent days
-    if len(backups_to_keep) > MAX_CLOUD_BACKUPS:
-        backups_to_delete.extend(backups_to_keep[MAX_CLOUD_BACKUPS:])
-        backups_to_keep = backups_to_keep[:MAX_CLOUD_BACKUPS]
+    for i, date in enumerate(sorted_dates):
+        day_backups = by_date[date]
+        # Sort day's backups by timestamp descending
+        day_backups.sort(key=lambda x: x['timestamp'], reverse=True)
+
+        if date == today:
+            # Today: keep last 3 backups
+            backups_to_keep.extend(day_backups[:3])
+            backups_to_delete.extend(day_backups[3:])
+        elif i <= 5:  # Past 5 days (i=0 is today, so i=1 to i=5 are past 5 days)
+            # Past days: keep only the backup closest to 23:00
+            # Find backup closest to 23:00 (end of day)
+            best_backup = None
+            best_diff = float('inf')
+            for backup in day_backups:
+                # Extract time from timestamp
+                time_str = backup['timestamp'][11:19]  # HH:MM:SS
+                hours, minutes, seconds = map(int, time_str.split(':'))
+                # Calculate difference from 23:00:00
+                backup_minutes = hours * 60 + minutes
+                target_minutes = 23 * 60  # 23:00
+                diff = abs(target_minutes - backup_minutes)
+                if diff < best_diff:
+                    best_diff = diff
+                    best_backup = backup
+
+            if best_backup:
+                backups_to_keep.append(best_backup)
+                backups_to_delete.extend([b for b in day_backups if b != best_backup])
+            else:
+                backups_to_delete.extend(day_backups)
+        else:
+            # Older than 5 days: delete all
+            backups_to_delete.extend(day_backups)
 
     # Delete old backups from JSONBin
     headers = _get_headers()
@@ -236,28 +405,49 @@ def _cleanup_old_backups(index):
 
 
 def _get_sheets_info():
-    """Get list of sheets from the database"""
+    """Get list of sheets from the database including spreadsheet_id"""
     import sqlite3
     sheets = []
     try:
         conn = sqlite3.connect(DATABASE_FILE)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute('SELECT id, name FROM sheets')
+        cursor.execute('SELECT id, spreadsheet_id, sheet_name FROM sheets')
         for row in cursor.fetchall():
             sheets.append({
                 'id': row['id'],
-                'name': row['name']
+                'spreadsheet_id': row['spreadsheet_id'],
+                'name': row['sheet_name']
             })
         conn.close()
-    except:
-        pass
+    except Exception as e:
+        print(f"Error getting sheets info: {e}")
     return sheets
 
 
-def upload_backup_to_cloud():
+def _get_all_spreadsheet_ids():
+    """Get all unique spreadsheet IDs from the database"""
+    import sqlite3
+    spreadsheet_ids = set()
+    try:
+        conn = sqlite3.connect(DATABASE_FILE)
+        cursor = conn.cursor()
+        cursor.execute('SELECT DISTINCT spreadsheet_id FROM sheets')
+        for row in cursor.fetchall():
+            spreadsheet_ids.add(row[0])
+        conn.close()
+    except:
+        pass
+    return list(spreadsheet_ids)
+
+
+def upload_backup_to_cloud(source='manual'):
     """Upload current database to JSONBin as base64-encoded JSON.
     Skips upload if data hasn't changed since last backup.
+    Saves backup reference to each spreadsheet's index for cross-machine sync.
+
+    Args:
+        source: 'manual' for user-initiated backups, 'auto' for hourly auto-backups
     """
     if not os.path.exists(DATABASE_FILE):
         return {'success': False, 'error': 'Database file not found'}
@@ -270,8 +460,15 @@ def upload_backup_to_cloud():
         # Compute hash of current database
         current_hash = _compute_db_hash()
 
-        # Check if data has changed since last backup
-        index = _load_backup_index()
+        # Get sheets info before backup
+        sheets_info = _get_sheets_info()
+        spreadsheet_ids = _get_all_spreadsheet_ids()
+
+        if not spreadsheet_ids:
+            return {'success': False, 'error': 'No spreadsheets found in database'}
+
+        # Check if data has changed since last backup (check first spreadsheet's index)
+        index = _load_backup_index_for_spreadsheet(spreadsheet_ids[0])
         if index.get('backups'):
             last_backup = max(index['backups'], key=lambda x: x['timestamp'])
             if last_backup.get('hash') == current_hash:
@@ -281,9 +478,6 @@ def upload_backup_to_cloud():
                     'skipped': True,
                     'message': 'No changes since last backup'
                 }
-
-        # Get sheets info before backup
-        sheets_info = _get_sheets_info()
 
         # Read and compress database file
         with open(DATABASE_FILE, 'rb') as f:
@@ -301,7 +495,8 @@ def upload_backup_to_cloud():
             'timestamp': datetime.now().isoformat(),
             'size': len(db_content),
             'compressed': True,
-            'sheets': sheets_info,  # Include sheets info in backup
+            'sheets': sheets_info,
+            'spreadsheet_ids': spreadsheet_ids,
             'data': base64.b64encode(compressed).decode('utf-8')
         }
 
@@ -319,20 +514,25 @@ def upload_backup_to_cloud():
             result = response.json()
             bin_id = result.get('metadata', {}).get('id')
 
-            # Update local index
-            index = _load_backup_index()
-            index['backups'].append({
+            # Create backup entry for index
+            backup_entry = {
                 'id': bin_id,
                 'name': backup_name,
                 'timestamp': backup_data['timestamp'],
                 'size': backup_data['size'],
-                'sheets': sheets_info,  # Include sheets info in index
-                'hash': current_hash  # Store hash for duplicate detection
-            })
+                'sheets': sheets_info,
+                'spreadsheet_ids': spreadsheet_ids,
+                'hash': current_hash,
+                'source': source  # 'manual' or 'auto'
+            }
 
-            # Cleanup: Keep only the latest backup per day, max 5 days
-            index = _cleanup_old_backups(index)
-            _save_backup_index(index)
+            # Save to each spreadsheet's index (for cross-machine sync)
+            for spreadsheet_id in spreadsheet_ids:
+                ss_index = _load_backup_index_for_spreadsheet(spreadsheet_id)
+                ss_index['backups'].append(backup_entry)
+                # Cleanup: Keep only the latest backup per day, max 5 days
+                ss_index = _cleanup_old_backups(ss_index)
+                _save_backup_index_for_spreadsheet(spreadsheet_id, ss_index)
 
             return {
                 'success': True,
@@ -353,29 +553,36 @@ def upload_backup_to_cloud():
         return {'success': False, 'error': str(e)}
 
 
-def list_cloud_backups(filter_sheet_id=None):
-    """List backups from the cloud index, optionally filtered by sheet_id
+def list_cloud_backups(filter_sheet_id=None, spreadsheet_id=None):
+    """List backups from the cloud index, optionally filtered by sheet_id or spreadsheet_id
 
     Args:
-        filter_sheet_id: If provided, only return backups that contain this sheet_id
+        filter_sheet_id: If provided, only return backups that contain this sheet_id (internal DB id)
+        spreadsheet_id: If provided, load index for this Google spreadsheet ID (for cross-machine sync)
     """
     api_key = get_api_key()
     if not api_key:
         return {'success': False, 'error': 'Cloud backup not configured', 'backups': []}
 
     try:
-        # Load index from cloud (or local cache)
-        index = _load_backup_index()
+        # Load index - if spreadsheet_id provided, use it; otherwise load for all spreadsheets
+        if spreadsheet_id:
+            index = _load_backup_index_for_spreadsheet(spreadsheet_id)
+        else:
+            index = _load_backup_index()
+
         backups = []
 
         for backup in index.get('backups', []):
             # Filter by sheet_id if provided
             if filter_sheet_id is not None:
                 backup_sheets = backup.get('sheets', [])
-                # Check if this backup contains the requested sheet
-                sheet_ids = [s.get('id') for s in backup_sheets]
-                if filter_sheet_id not in sheet_ids:
-                    continue  # Skip backups that don't include this sheet
+                # If sheets list is empty, show the backup (it's a full backup)
+                # Otherwise check if this backup contains the requested sheet
+                if backup_sheets:  # Only filter if we have sheet info
+                    sheet_ids = [s.get('id') for s in backup_sheets]
+                    if filter_sheet_id not in sheet_ids:
+                        continue  # Skip backups that don't include this sheet
 
             backups.append({
                 'id': backup['id'],
@@ -384,7 +591,7 @@ def list_cloud_backups(filter_sheet_id=None):
                 'timestamp': backup['timestamp'],
                 'size': backup.get('size', 0),
                 'sheets': backup.get('sheets', []),  # Include sheets info
-                'source': 'cloud'
+                'source': backup.get('source', 'manual')  # Use actual source from backup
             })
 
         # Sort by timestamp descending
@@ -619,7 +826,7 @@ def compare_with_cloud(bin_id, sheet_id=None):
 
 
 def delete_cloud_backup(bin_id):
-    """Delete a backup from JSONBin and local index"""
+    """Delete a backup from JSONBin and all spreadsheet indexes"""
     api_key = get_api_key()
     if not api_key:
         return {'success': False, 'error': 'Cloud backup not configured'}
@@ -632,15 +839,19 @@ def delete_cloud_backup(bin_id):
             headers=headers
         )
 
-        # Remove from local index regardless of API response
-        index = _load_backup_index()
-        index['backups'] = [b for b in index['backups'] if b['id'] != bin_id]
-        _save_backup_index(index)
+        # Remove from all spreadsheet indexes
+        spreadsheet_ids = _get_all_spreadsheet_ids()
+        for spreadsheet_id in spreadsheet_ids:
+            ss_index = _load_backup_index_for_spreadsheet(spreadsheet_id)
+            original_count = len(ss_index.get('backups', []))
+            ss_index['backups'] = [b for b in ss_index.get('backups', []) if b['id'] != bin_id]
+            if len(ss_index['backups']) < original_count:
+                _save_backup_index_for_spreadsheet(spreadsheet_id, ss_index)
 
         if response.status_code == 200:
             return {'success': True}
         else:
-            # Still return success since we removed from index
+            # Still return success since we removed from indexes
             return {'success': True}
 
     except Exception as e:

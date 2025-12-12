@@ -3,7 +3,12 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.5.2';
+const FE_VERSION = '0.6.0';
+
+// Auto-polling configuration
+const POLL_INTERVAL_MS = 10000; // 10 seconds
+let pollIntervalId = null;
+let currentUserEmail = null;
 
 // API Base URL
 const API_BASE = '/api';
@@ -162,12 +167,110 @@ async function loadBackendVersion() {
 // ============================================
 
 function updateSheetUI() {
-    const refreshBtn = document.getElementById('refreshData');
-
+    // Start or stop polling based on whether we have an active sheet
     if (currentSheetId) {
-        refreshBtn.style.display = 'inline-block';
+        startPolling();
     } else {
-        refreshBtn.style.display = 'none';
+        stopPolling();
+        updateActiveUsersDisplay([]);
+    }
+}
+
+// ============================================
+// Auto-Polling Functions
+// ============================================
+
+function startPolling() {
+    // Don't start if already polling
+    if (pollIntervalId) return;
+
+    // Get email from localStorage if not set
+    if (!currentUserEmail) {
+        const storedUserInfo = localStorage.getItem('google_user_info');
+        if (storedUserInfo) {
+            const userInfo = JSON.parse(storedUserInfo);
+            currentUserEmail = userInfo.email || null;
+        }
+    }
+
+    // Start polling
+    pollIntervalId = setInterval(pollForUpdates, POLL_INTERVAL_MS);
+    console.log('Polling started (every 10 seconds)');
+
+    // Do an initial poll immediately
+    pollForUpdates();
+}
+
+function stopPolling() {
+    if (pollIntervalId) {
+        clearInterval(pollIntervalId);
+        pollIntervalId = null;
+        console.log('Polling stopped');
+    }
+}
+
+async function pollForUpdates() {
+    if (!currentSheetId) return;
+
+    try {
+        const response = await apiPost(`/sheets/${currentSheetId}/heartbeat`, {
+            email: currentUserEmail || 'Anonymous'
+        });
+
+        if (response.error) {
+            console.error('Polling error:', response.error);
+            return;
+        }
+
+        // Check if data has changed by comparing attendance data
+        const newAttendanceStr = JSON.stringify(response.attendanceData);
+        const currentAttendanceStr = JSON.stringify(attendanceData);
+
+        if (newAttendanceStr !== currentAttendanceStr) {
+            // Data changed - update local state and re-render
+            console.log('Data changed from server, updating...');
+            teamMembers = response.teamMembers || [];
+            attendanceData = response.attendanceData || {};
+
+            if (response.sheet) {
+                startDate = new Date(response.sheet.start_date);
+                endDate = new Date(response.sheet.end_date);
+            }
+
+            renderTable();
+        }
+
+        // Update active users display
+        updateActiveUsersDisplay(response.activeUsers || []);
+
+    } catch (error) {
+        console.error('Polling error:', error);
+    }
+}
+
+function updateActiveUsersDisplay(activeUsers) {
+    let container = document.getElementById('activeUsersContainer');
+
+    // Create container if it doesn't exist
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'activeUsersContainer';
+        container.className = 'active-users-container';
+
+        // Insert after the header
+        const header = document.querySelector('header');
+        if (header) {
+            header.after(container);
+        }
+    }
+
+    if (activeUsers.length === 0) {
+        container.innerHTML = '';
+        container.style.display = 'none';
+    } else {
+        container.style.display = 'block';
+        const usersList = activeUsers.join(', ');
+        container.innerHTML = `<span class="active-users-label">משתמשים פעילים:</span> <span class="active-users-list">${usersList}</span>`;
     }
 }
 
@@ -216,9 +319,13 @@ function disconnectCurrentSheet() {
         return;
     }
 
+    // Stop polling
+    stopPolling();
+
     // Clear local state
     currentSheetId = null;
     currentSpreadsheetId = null;
+    currentUserEmail = null;
     teamMembers = [];
     attendanceData = {};
 
@@ -390,6 +497,7 @@ async function fetchUserInfo() {
         const userInfo = await response.json();
 
         localStorage.setItem('google_user_info', JSON.stringify(userInfo));
+        currentUserEmail = userInfo.email || null;
     } catch (error) {
         console.error('Error fetching user info:', error);
     }
@@ -1868,13 +1976,16 @@ async function loadCloudBackupList() {
             const sizeKB = (backup.size / 1024).toFixed(1);
             // Escape path for use in onclick
             const escapedPath = backup.path.replace(/'/g, "\\'");
+            // Get source badge text (manual or auto)
+            const sourceBadge = backup.source === 'auto' ? 'אוטומטי' : 'ידני';
+            const sourceBadgeClass = backup.source === 'auto' ? 'source-auto' : 'source-manual';
 
             return `
                 <div class="backup-item cloud-backup" data-path="${backup.path}">
                     <div class="backup-item-info">
                         <span class="backup-item-date">${formattedDate}</span>
                         <span class="backup-item-size">${sizeKB} KB</span>
-                        <span class="backup-source-badge">ענן</span>
+                        <span class="backup-source-badge ${sourceBadgeClass}">${sourceBadge}</span>
                     </div>
                     <div class="backup-item-actions">
                         <button class="btn-compare-cloud" onclick="compareWithCloud('${escapedPath}', event)">השווה</button>
@@ -2139,9 +2250,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Export
     document.getElementById('exportData').addEventListener('click', exportData);
-
-    // Refresh button
-    document.getElementById('refreshData').addEventListener('click', refreshDataFromBackend);
 
     // Column mapping modal buttons
     document.getElementById('confirmMappingBtn').addEventListener('click', confirmColumnMapping);

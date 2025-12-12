@@ -69,6 +69,27 @@ header h1 {
     font-size: 1.1rem;
 }
 
+/* Active Users Display */
+.active-users-container {
+    background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+    color: white;
+    padding: 10px 20px;
+    text-align: center;
+    font-size: 0.95rem;
+    display: none;
+}
+
+.active-users-label {
+    font-weight: bold;
+    margin-left: 8px;
+}
+
+.active-users-list {
+    font-weight: normal;
+    direction: ltr;
+    display: inline;
+}
+
 /* Upload Section */
 .upload-section {
     background: #f8f9fa;
@@ -1858,6 +1879,14 @@ thead .col-yamam {
     color: white;
     border-radius: 10px;
     font-weight: 600;
+}
+
+.backup-source-badge.source-manual {
+    background: #28a745;
+}
+
+.backup-source-badge.source-auto {
+    background: #6c757d;
 }
 
 .cloud-backup {

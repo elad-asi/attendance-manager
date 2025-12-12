@@ -5,9 +5,30 @@ import shutil
 import glob
 from datetime import datetime
 
-DATABASE_FILE = 'data/attendance.db'
-BACKUP_DIR = 'data/backups'
+# Use absolute paths relative to this script's directory
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DATABASE_FILE = os.path.join(SCRIPT_DIR, 'data', 'attendance.db')
+BACKUP_DIR = os.path.join(SCRIPT_DIR, 'data', 'backups')
 MAX_BACKUPS = 10
+
+def get_db_mtime():
+    """Get the last modified time of the database file"""
+    if os.path.exists(DATABASE_FILE):
+        return os.path.getmtime(DATABASE_FILE)
+    return None
+
+def validate_db_modified(before_mtime, operation_name):
+    """Validate that the database was modified after an operation"""
+    after_mtime = get_db_mtime()
+    if before_mtime is not None and after_mtime is not None:
+        if after_mtime <= before_mtime:
+            print(f"WARNING: Database file was NOT modified after {operation_name}")
+            print(f"  Before: {before_mtime}, After: {after_mtime}")
+            print(f"  Database path: {DATABASE_FILE}")
+            return False
+        else:
+            print(f"DB validated: {operation_name} - file modified at {datetime.fromtimestamp(after_mtime).isoformat()}")
+    return True
 
 def get_db_connection():
     """Get a database connection with row factory"""
@@ -89,7 +110,7 @@ def restore_backup(backup_filename):
 
 def init_database():
     """Initialize the database schema"""
-    os.makedirs('data', exist_ok=True)
+    os.makedirs(os.path.join(SCRIPT_DIR, 'data'), exist_ok=True)
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -249,6 +270,9 @@ def get_team_members(sheet_id):
 
 def update_attendance(sheet_id, ma, date, status):
     """Update attendance for a specific member and date"""
+    # Get timestamp before operation for validation
+    before_mtime = get_db_mtime()
+
     # Create backup before making changes
     create_backup()
 
@@ -262,6 +286,9 @@ def update_attendance(sheet_id, ma, date, status):
 
     conn.commit()
     conn.close()
+
+    # Validate DB was modified
+    validate_db_modified(before_mtime, f"update_attendance(ma={ma}, date={date}, status={status})")
 
 def get_attendance(sheet_id):
     """Get all attendance data for a sheet"""

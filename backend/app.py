@@ -16,7 +16,11 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '0.5.2'
+BE_VERSION = '0.6.0'
+
+# Active users tracking (email -> {sheet_id, last_seen})
+active_users = {}
+ACTIVE_USER_TIMEOUT_SECONDS = 30  # Consider user inactive after 30 seconds
 
 # Auto-backup configuration
 AUTO_BACKUP_INTERVAL_SECONDS = 60 * 60  # 1 hour
@@ -461,6 +465,70 @@ def get_version():
     return jsonify({'version': BE_VERSION})
 
 # ============================================
+# Active Users Tracking
+# ============================================
+
+def cleanup_inactive_users():
+    """Remove users who haven't been seen in the timeout period"""
+    global active_users
+    now = time.time()
+    active_users = {
+        email: data for email, data in active_users.items()
+        if now - data['last_seen'] < ACTIVE_USER_TIMEOUT_SECONDS
+    }
+
+@app.route('/api/sheets/<int:sheet_id>/heartbeat', methods=['POST'])
+def heartbeat(sheet_id):
+    """Register user activity on a sheet and return current data + active users"""
+    req = request.json or {}
+    user_email = req.get('email', 'Anonymous')
+
+    # Update active users
+    active_users[user_email] = {
+        'sheet_id': sheet_id,
+        'last_seen': time.time()
+    }
+
+    # Cleanup inactive users
+    cleanup_inactive_users()
+
+    # Get list of other active users on this sheet
+    other_users = [
+        email for email, data in active_users.items()
+        if data['sheet_id'] == sheet_id and email != user_email
+    ]
+
+    # Get current data from database
+    sheet = db.get_sheet_by_id(sheet_id)
+    if not sheet:
+        return jsonify({'error': 'Sheet not found'}), 404
+
+    team_members = db.get_team_members(sheet_id)
+    attendance_data = db.get_attendance(sheet_id)
+
+    return jsonify({
+        'success': True,
+        'sheet': sheet,
+        'teamMembers': team_members,
+        'attendanceData': attendance_data,
+        'activeUsers': other_users
+    })
+
+@app.route('/api/sheets/<int:sheet_id>/active-users', methods=['GET'])
+def get_active_users(sheet_id):
+    """Get list of active users on a sheet"""
+    cleanup_inactive_users()
+
+    users_on_sheet = [
+        email for email, data in active_users.items()
+        if data['sheet_id'] == sheet_id
+    ]
+
+    return jsonify({
+        'activeUsers': users_on_sheet
+    })
+
+# ============================================
 # Backup Management
 # ============================================
 
@@ -593,10 +661,16 @@ def restore_backup_api(filename):
 
 @app.route('/api/cloud-backups', methods=['GET'])
 def list_cloud_backups():
-    """List backups from cloud, optionally filtered by sheet_id"""
-    # Get optional sheet_id filter from query params
+    """List backups from cloud, optionally filtered by sheet_id or spreadsheet_id
+
+    Query params:
+        sheet_id: Internal DB sheet ID to filter backups
+        spreadsheet_id: Google spreadsheet ID for cross-machine sync
+    """
+    # Get optional filters from query params
     sheet_id = request.args.get('sheet_id', type=int)
-    result = cloud_backup.list_cloud_backups(filter_sheet_id=sheet_id)
+    spreadsheet_id = request.args.get('spreadsheet_id', type=str)
+    result = cloud_backup.list_cloud_backups(filter_sheet_id=sheet_id, spreadsheet_id=spreadsheet_id)
     return jsonify(result)
 
 @app.route('/api/cloud-backups/upload', methods=['POST'])
@@ -665,7 +739,7 @@ def auto_backup_worker():
         try:
             if cloud_backup.is_cloud_configured():
                 print("Auto-backup: Running hourly backup check...")
-                result = cloud_backup.upload_backup_to_cloud()
+                result = cloud_backup.upload_backup_to_cloud(source='auto')
                 if result.get('success'):
                     if result.get('skipped'):
                         print("Auto-backup: Skipped - no changes since last backup")
