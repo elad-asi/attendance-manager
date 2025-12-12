@@ -16,12 +16,10 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '0.6.8'
+BE_VERSION = '0.6.9'
 
-# Active users tracking (session_id -> {email, sheet_id, last_seen})
-# Using session_id allows same user from multiple devices
-active_users = {}
-ACTIVE_USER_TIMEOUT_SECONDS = 30  # Consider user inactive after 30 seconds
+# NOTE: Active users are now tracked in SQLite database (see database.py)
+# This allows multi-worker deployments (like Gunicorn) to share state
 
 # Auto-backup configuration
 AUTO_BACKUP_INTERVAL_SECONDS = 60 * 60  # 1 hour
@@ -466,17 +464,8 @@ def get_version():
     return jsonify({'version': BE_VERSION})
 
 # ============================================
-# Active Users Tracking
+# Active Users Tracking (Database-backed for multi-worker support)
 # ============================================
-
-def cleanup_inactive_users():
-    """Remove users who haven't been seen in the timeout period"""
-    global active_users
-    now = time.time()
-    active_users = {
-        session_id: data for session_id, data in active_users.items()
-        if now - data['last_seen'] < ACTIVE_USER_TIMEOUT_SECONDS
-    }
 
 @app.route('/api/sheets/<int:sheet_id>/heartbeat', methods=['POST'])
 def heartbeat(sheet_id):
@@ -485,21 +474,11 @@ def heartbeat(sheet_id):
     user_email = req.get('email', 'Anonymous')
     session_id = req.get('sessionId', 'unknown')
 
-    # Update active users - keyed by session_id to allow same user on multiple machines
-    active_users[session_id] = {
-        'email': user_email,
-        'sheet_id': sheet_id,
-        'last_seen': time.time()
-    }
-
-    # Cleanup inactive users
-    cleanup_inactive_users()
+    # Update active users in database (shared across all workers)
+    db.update_active_user(session_id, user_email, sheet_id, time.time())
 
     # Get list of other active users on this sheet (exclude current session)
-    other_users = [
-        data['email'] for sid, data in active_users.items()
-        if data['sheet_id'] == sheet_id and sid != session_id
-    ]
+    other_users = db.get_active_users_for_sheet(sheet_id, exclude_session=session_id)
 
     # Get current data from database
     sheet = db.get_sheet_by_id(sheet_id)
@@ -520,12 +499,7 @@ def heartbeat(sheet_id):
 @app.route('/api/sheets/<int:sheet_id>/active-users', methods=['GET'])
 def get_active_users(sheet_id):
     """Get list of active users on a sheet"""
-    cleanup_inactive_users()
-
-    users_on_sheet = [
-        data['email'] for session_id, data in active_users.items()
-        if data['sheet_id'] == sheet_id
-    ]
+    users_on_sheet = db.get_all_active_users_for_sheet(sheet_id)
 
     return jsonify({
         'activeUsers': users_on_sheet

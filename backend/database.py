@@ -161,10 +161,22 @@ def init_database():
         )
     ''')
 
+    # Active users table - for tracking who's online (shared across workers)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS active_users (
+            session_id TEXT PRIMARY KEY,
+            email TEXT DEFAULT 'Anonymous',
+            sheet_id INTEGER NOT NULL,
+            last_seen REAL NOT NULL,
+            FOREIGN KEY (sheet_id) REFERENCES sheets(id) ON DELETE CASCADE
+        )
+    ''')
+
     # Create indexes for faster lookups
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_attendance_sheet ON attendance(sheet_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_attendance_ma ON attendance(ma)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_team_members_sheet ON team_members(sheet_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_active_users_sheet ON active_users(sheet_id)')
 
     conn.commit()
     conn.close()
@@ -331,6 +343,65 @@ def delete_sheet(sheet_id):
     cursor.execute('DELETE FROM sheets WHERE id = ?', (sheet_id,))
     conn.commit()
     conn.close()
+
+# ============================================
+# Active Users Functions (for multi-worker support)
+# ============================================
+
+ACTIVE_USER_TIMEOUT_SECONDS = 30  # Consider user inactive after 30 seconds
+
+def update_active_user(session_id, email, sheet_id, last_seen):
+    """Update or insert an active user session"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT OR REPLACE INTO active_users (session_id, email, sheet_id, last_seen)
+        VALUES (?, ?, ?, ?)
+    ''', (session_id, email, sheet_id, last_seen))
+    conn.commit()
+    conn.close()
+
+def cleanup_inactive_users():
+    """Remove users who haven't been seen recently"""
+    import time
+    cutoff = time.time() - ACTIVE_USER_TIMEOUT_SECONDS
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM active_users WHERE last_seen < ?', (cutoff,))
+    conn.commit()
+    conn.close()
+
+def get_active_users_for_sheet(sheet_id, exclude_session=None):
+    """Get list of active user emails for a sheet, optionally excluding a session"""
+    cleanup_inactive_users()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    if exclude_session:
+        cursor.execute('''
+            SELECT email FROM active_users
+            WHERE sheet_id = ? AND session_id != ?
+        ''', (sheet_id, exclude_session))
+    else:
+        cursor.execute('''
+            SELECT email FROM active_users WHERE sheet_id = ?
+        ''', (sheet_id,))
+
+    rows = cursor.fetchall()
+    conn.close()
+    return [row['email'] for row in rows]
+
+def get_all_active_users_for_sheet(sheet_id):
+    """Get all active users for a sheet (including current session)"""
+    cleanup_inactive_users()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT email FROM active_users WHERE sheet_id = ?
+    ''', (sheet_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    return [row['email'] for row in rows]
 
 # Initialize database when module is imported
 init_database()
