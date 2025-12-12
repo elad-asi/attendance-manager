@@ -19,6 +19,10 @@ INDEX_FILE = 'data/cloud_index.json'
 # JSONBin.io API
 JSONBIN_API_URL = 'https://api.jsonbin.io/v3'
 
+# Master index bin ID (stores list of all backup bin IDs)
+# Set JSONBIN_INDEX_ID env var or it will be created on first upload
+INDEX_BIN_ID_FILE = 'data/cloud_index_bin_id.txt'
+
 
 def get_api_key():
     """Get JSONBin API key from environment or file"""
@@ -60,8 +64,95 @@ def _get_headers():
     }
 
 
+def _get_index_bin_id():
+    """Get the master index bin ID from env or file"""
+    # Try environment variable first
+    bin_id = os.environ.get('JSONBIN_INDEX_ID')
+    if bin_id:
+        return bin_id
+
+    # Try loading from file
+    if os.path.exists(INDEX_BIN_ID_FILE):
+        try:
+            with open(INDEX_BIN_ID_FILE, 'r') as f:
+                return f.read().strip()
+        except:
+            pass
+
+    return None
+
+
+def _save_index_bin_id(bin_id):
+    """Save the index bin ID to file"""
+    os.makedirs(os.path.dirname(INDEX_BIN_ID_FILE), exist_ok=True)
+    with open(INDEX_BIN_ID_FILE, 'w') as f:
+        f.write(bin_id)
+
+
+def _load_cloud_index():
+    """Load the backup index from JSONBin"""
+    index_bin_id = _get_index_bin_id()
+    if not index_bin_id:
+        return {'backups': []}
+
+    try:
+        headers = _get_headers()
+        response = requests.get(
+            f'{JSONBIN_API_URL}/b/{index_bin_id}/latest',
+            headers=headers
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            return result.get('record', {'backups': []})
+        else:
+            return {'backups': []}
+    except:
+        return {'backups': []}
+
+
+def _save_cloud_index(index):
+    """Save the backup index to JSONBin"""
+    headers = _get_headers()
+    index_bin_id = _get_index_bin_id()
+
+    if index_bin_id:
+        # Update existing index bin
+        response = requests.put(
+            f'{JSONBIN_API_URL}/b/{index_bin_id}',
+            headers=headers,
+            json=index
+        )
+        return response.status_code == 200
+    else:
+        # Create new index bin
+        headers['X-Bin-Name'] = 'attendance_backup_index'
+        response = requests.post(
+            f'{JSONBIN_API_URL}/b',
+            headers=headers,
+            json=index
+        )
+        if response.status_code in [200, 201]:
+            result = response.json()
+            new_bin_id = result.get('metadata', {}).get('id')
+            if new_bin_id:
+                _save_index_bin_id(new_bin_id)
+                print(f"Created new index bin: {new_bin_id}")
+                print(f"Add JSONBIN_INDEX_ID={new_bin_id} to Render environment variables!")
+                return True
+        return False
+
+
 def _load_backup_index():
-    """Load the index of all backups"""
+    """Load the index of all backups (from cloud or local cache)"""
+    # Try cloud first
+    cloud_index = _load_cloud_index()
+    if cloud_index.get('backups'):
+        # Cache locally
+        _save_backup_index(cloud_index)
+        return cloud_index
+
+    # Fall back to local cache
     if os.path.exists(INDEX_FILE):
         try:
             with open(INDEX_FILE, 'r') as f:
@@ -72,10 +163,13 @@ def _load_backup_index():
 
 
 def _save_backup_index(index):
-    """Save the backup index"""
+    """Save the backup index locally and to cloud"""
     os.makedirs(os.path.dirname(INDEX_FILE), exist_ok=True)
     with open(INDEX_FILE, 'w') as f:
         json.dump(index, f, indent=2)
+
+    # Also save to cloud
+    _save_cloud_index(index)
 
 
 def upload_backup_to_cloud():
@@ -151,55 +245,29 @@ def upload_backup_to_cloud():
 
 
 def list_cloud_backups():
-    """List all backups from JSONBin.io API"""
+    """List all backups from the cloud index"""
     api_key = get_api_key()
     if not api_key:
         return {'success': False, 'error': 'Cloud backup not configured', 'backups': []}
 
     try:
-        headers = _get_headers()
+        # Load index from cloud (or local cache)
+        index = _load_backup_index()
+        backups = []
 
-        # Fetch bins from JSONBin API
-        response = requests.get(
-            f'{JSONBIN_API_URL}/c/uncategorized/bins',
-            headers=headers
-        )
+        for backup in index.get('backups', []):
+            backups.append({
+                'id': backup['id'],
+                'filename': backup['name'],
+                'path': backup['id'],  # Use ID as path for consistency
+                'timestamp': backup['timestamp'],
+                'size': backup.get('size', 0),
+                'source': 'cloud'
+            })
 
-        if response.status_code == 200:
-            bins = response.json()
-            backups = []
-
-            for bin_info in bins:
-                # Filter for attendance backups by name pattern
-                bin_name = bin_info.get('snippetMeta', {}).get('name', '')
-                if bin_name.startswith('attendance_backup_'):
-                    bin_id = bin_info.get('record', '')
-                    created_at = bin_info.get('createdAt', '')
-
-                    backups.append({
-                        'id': bin_id,
-                        'filename': bin_name,
-                        'path': bin_id,
-                        'timestamp': created_at,
-                        'size': 0,  # Size not available in list API
-                        'source': 'cloud'
-                    })
-
-            # Sort by timestamp descending
-            backups.sort(key=lambda x: x['timestamp'], reverse=True)
-
-            # Also update local index for faster access next time
-            if backups:
-                index = {'backups': [{'id': b['id'], 'name': b['filename'], 'timestamp': b['timestamp'], 'size': b['size']} for b in backups]}
-                _save_backup_index(index)
-
-            return {'success': True, 'backups': backups}
-        else:
-            try:
-                error_msg = response.json().get('message', response.text)
-            except:
-                error_msg = f'HTTP {response.status_code}: {response.text}'
-            return {'success': False, 'error': error_msg, 'backups': []}
+        # Sort by timestamp descending
+        backups.sort(key=lambda x: x['timestamp'], reverse=True)
+        return {'success': True, 'backups': backups}
 
     except Exception as e:
         return {'success': False, 'error': str(e), 'backups': []}
