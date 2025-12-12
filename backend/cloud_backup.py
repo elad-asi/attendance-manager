@@ -41,7 +41,7 @@ MAX_CLOUD_BACKUPS = 5
 HARDCODED_INDEX_BIN_ID = '693bbf3a43b1c97be9e89bd6'
 
 # Hardcoded API key for JSONBin.io (fallback if env var not set)
-HARDCODED_API_KEY = '$2a$10$iqgBfLNqJIrlht8mI8U8UOZoq.gWomu0j.T/Li03aYLdqBy9FWs6a'
+HARDCODED_API_KEY = '$2a$10$ZzyHz/Jk0nNhtikSlY7TpunjyhHL6mF6YwDl141GW4yjhMDiN6Rqa'
 
 
 def _compute_db_hash():
