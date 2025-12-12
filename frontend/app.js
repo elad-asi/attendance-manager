@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.6.12';
+const FE_VERSION = '0.6.13';
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -419,6 +419,7 @@ async function loadFromBackend() {
                 localStorage.removeItem('current_sheet_id');
                 localStorage.removeItem('current_sheet_info');
                 currentSheetId = null;
+                currentSpreadsheetId = null;
             } else {
                 teamMembers = response.teamMembers || [];
                 attendanceData = response.attendanceData || {};
@@ -428,6 +429,8 @@ async function loadFromBackend() {
                     endDate = new Date(response.sheet.end_date);
                     document.getElementById('startDate').value = response.sheet.start_date;
                     document.getElementById('endDate').value = response.sheet.end_date;
+                    // Restore Google Spreadsheet ID for display
+                    currentSpreadsheetId = response.sheet.spreadsheet_id || null;
                 }
             }
         }
