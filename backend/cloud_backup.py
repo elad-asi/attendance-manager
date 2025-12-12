@@ -246,6 +246,161 @@ def restore_from_cloud(bin_id):
         return {'success': False, 'error': str(e)}
 
 
+def compare_with_cloud(bin_id, sheet_id=None):
+    """Compare current database with a cloud backup and return differences"""
+    import tempfile
+    import sqlite3
+
+    # Download the backup
+    result = download_backup_from_cloud(bin_id)
+    if not result['success']:
+        return result
+
+    try:
+        # Write backup to temp file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as tmp:
+            tmp.write(result['content'])
+            tmp_path = tmp.name
+
+        # Connect to both databases
+        current_conn = sqlite3.connect(DATABASE_FILE)
+        current_conn.row_factory = sqlite3.Row
+        backup_conn = sqlite3.connect(tmp_path)
+        backup_conn.row_factory = sqlite3.Row
+
+        differences = {
+            'attendance_changes': [],
+            'members_added': [],
+            'members_removed': [],
+            'summary': {}
+        }
+
+        # Get sheets to compare
+        if sheet_id:
+            sheet_ids = [sheet_id]
+        else:
+            # Get all sheet IDs from current DB
+            cursor = current_conn.cursor()
+            cursor.execute('SELECT id FROM sheets')
+            sheet_ids = [row['id'] for row in cursor.fetchall()]
+
+        for sid in sheet_ids:
+            # Compare attendance data
+            current_cursor = current_conn.cursor()
+            backup_cursor = backup_conn.cursor()
+
+            # Get current attendance
+            current_cursor.execute('''
+                SELECT a.ma, a.date, a.status, t.first_name, t.last_name
+                FROM attendance a
+                LEFT JOIN team_members t ON a.sheet_id = t.sheet_id AND a.ma = t.ma
+                WHERE a.sheet_id = ?
+            ''', (sid,))
+            current_attendance = {(row['ma'], row['date']): {
+                'status': row['status'],
+                'name': f"{row['first_name'] or ''} {row['last_name'] or ''}".strip()
+            } for row in current_cursor.fetchall()}
+
+            # Get backup attendance
+            try:
+                backup_cursor.execute('''
+                    SELECT a.ma, a.date, a.status, t.first_name, t.last_name
+                    FROM attendance a
+                    LEFT JOIN team_members t ON a.sheet_id = t.sheet_id AND a.ma = t.ma
+                    WHERE a.sheet_id = ?
+                ''', (sid,))
+                backup_attendance = {(row['ma'], row['date']): {
+                    'status': row['status'],
+                    'name': f"{row['first_name'] or ''} {row['last_name'] or ''}".strip()
+                } for row in backup_cursor.fetchall()}
+            except:
+                backup_attendance = {}
+
+            # Find differences
+            all_keys = set(current_attendance.keys()) | set(backup_attendance.keys())
+
+            for key in all_keys:
+                ma, date = key
+                current_data = current_attendance.get(key)
+                backup_data = backup_attendance.get(key)
+
+                if current_data and backup_data:
+                    if current_data['status'] != backup_data['status']:
+                        differences['attendance_changes'].append({
+                            'ma': ma,
+                            'date': date,
+                            'name': current_data['name'] or backup_data['name'],
+                            'current_status': current_data['status'],
+                            'backup_status': backup_data['status']
+                        })
+                elif current_data and not backup_data:
+                    differences['attendance_changes'].append({
+                        'ma': ma,
+                        'date': date,
+                        'name': current_data['name'],
+                        'current_status': current_data['status'],
+                        'backup_status': None,
+                        'type': 'added'
+                    })
+                elif backup_data and not current_data:
+                    differences['attendance_changes'].append({
+                        'ma': ma,
+                        'date': date,
+                        'name': backup_data['name'],
+                        'current_status': None,
+                        'backup_status': backup_data['status'],
+                        'type': 'removed'
+                    })
+
+            # Compare team members
+            current_cursor.execute('SELECT ma, first_name, last_name FROM team_members WHERE sheet_id = ?', (sid,))
+            current_members = {row['ma']: f"{row['first_name']} {row['last_name']}" for row in current_cursor.fetchall()}
+
+            try:
+                backup_cursor.execute('SELECT ma, first_name, last_name FROM team_members WHERE sheet_id = ?', (sid,))
+                backup_members = {row['ma']: f"{row['first_name']} {row['last_name']}" for row in backup_cursor.fetchall()}
+            except:
+                backup_members = {}
+
+            # Members in current but not backup
+            for ma in set(current_members.keys()) - set(backup_members.keys()):
+                differences['members_added'].append({'ma': ma, 'name': current_members[ma]})
+
+            # Members in backup but not current
+            for ma in set(backup_members.keys()) - set(current_members.keys()):
+                differences['members_removed'].append({'ma': ma, 'name': backup_members[ma]})
+
+        # Summary
+        differences['summary'] = {
+            'attendance_changed': len([d for d in differences['attendance_changes'] if 'type' not in d]),
+            'attendance_added': len([d for d in differences['attendance_changes'] if d.get('type') == 'added']),
+            'attendance_removed': len([d for d in differences['attendance_changes'] if d.get('type') == 'removed']),
+            'members_added': len(differences['members_added']),
+            'members_removed': len(differences['members_removed'])
+        }
+
+        current_conn.close()
+        backup_conn.close()
+
+        # Clean up temp file
+        os.remove(tmp_path)
+
+        return {
+            'success': True,
+            'differences': differences,
+            'has_changes': any([
+                differences['summary']['attendance_changed'],
+                differences['summary']['attendance_added'],
+                differences['summary']['attendance_removed'],
+                differences['summary']['members_added'],
+                differences['summary']['members_removed']
+            ])
+        }
+
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+
 def delete_cloud_backup(bin_id):
     """Delete a backup from JSONBin and local index"""
     api_key = get_api_key()

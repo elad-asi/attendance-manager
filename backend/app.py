@@ -14,7 +14,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '0.4.2'
+BE_VERSION = '0.4.3'
 
 # Configuration
 GOOGLE_CLIENT_ID = '651831609522-bvrgmop9hmdghlrn2tqm1hv0dmkhu933.apps.googleusercontent.com'
@@ -631,6 +631,19 @@ def get_cloud_status():
         'configured': is_configured,
         'message': 'Cloud backup is ready' if is_configured else 'Cloud backup not configured. Set JSONBIN_API_KEY environment variable.'
     })
+
+@app.route('/api/cloud-backups/compare', methods=['POST'])
+def compare_with_cloud_backup():
+    """Compare current database with a cloud backup"""
+    data = request.get_json()
+    file_path = data.get('path')
+    sheet_id = data.get('sheet_id')
+    if not file_path:
+        return jsonify({'success': False, 'error': 'File path required'}), 400
+    result = cloud_backup.compare_with_cloud(file_path, sheet_id)
+    if result['success']:
+        return jsonify(result)
+    return jsonify(result), 400
 
 # ============================================
 # Main

@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.4.1';
+const FE_VERSION = '0.4.3';
 
 // API Base URL
 const API_BASE = '/api';
@@ -1886,6 +1886,7 @@ async function loadCloudBackupList() {
                         <span class="backup-source-badge">ענן</span>
                     </div>
                     <div class="backup-item-actions">
+                        <button class="btn-compare-cloud" onclick="compareWithCloud('${escapedPath}', event)">השווה</button>
                         <button class="btn-restore-cloud" onclick="restoreFromCloud('${escapedPath}')">שחזר</button>
                         <button class="btn-delete-cloud" onclick="deleteFromCloud('${escapedPath}')">מחק</button>
                     </div>
@@ -1980,6 +1981,122 @@ async function deleteFromCloud(filePath) {
         console.error('Error deleting from cloud:', error);
         alert('שגיאה במחיקה מהענן');
     }
+}
+
+async function compareWithCloud(filePath, evt) {
+    try {
+        // Show loading state
+        const compareBtn = evt ? evt.target : null;
+        const originalText = compareBtn ? compareBtn.textContent : '';
+        if (compareBtn) {
+            compareBtn.disabled = true;
+            compareBtn.textContent = 'משווה...';
+        }
+
+        const response = await fetch(`${API_BASE}/cloud-backups/compare`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ path: filePath })
+        });
+        const data = await response.json();
+
+        if (compareBtn) {
+            compareBtn.disabled = false;
+            compareBtn.textContent = originalText;
+        }
+
+        if (data.success) {
+            showCompareResults(data);
+        } else {
+            alert('שגיאה בהשוואה: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error comparing with cloud:', error);
+        alert('שגיאה בהשוואה מהענן');
+    }
+}
+
+function showCompareResults(data) {
+    const diff = data.differences;
+    const summary = diff.summary;
+
+    if (!data.has_changes) {
+        alert('אין הבדלים בין המסד הנוכחי לגיבוי בענן');
+        return;
+    }
+
+    // Build the comparison report
+    let report = `השוואת גיבוי ענן\n`;
+    report += `${'='.repeat(40)}\n\n`;
+
+    report += `סיכום:\n`;
+    report += `- שינויי נוכחות: ${summary.attendance_changed}\n`;
+    report += `- רשומות נוכחות חדשות: ${summary.attendance_added}\n`;
+    report += `- רשומות נוכחות שנמחקו: ${summary.attendance_removed}\n`;
+    report += `- חיילים חדשים: ${summary.members_added}\n`;
+    report += `- חיילים שנמחקו: ${summary.members_removed}\n\n`;
+
+    // Show attendance changes (limit to first 20)
+    const attendanceChanges = diff.attendance_changes.filter(d => !d.type);
+    if (attendanceChanges.length > 0) {
+        report += `שינויי נוכחות (${attendanceChanges.length > 20 ? 'מציג 20 מתוך ' + attendanceChanges.length : attendanceChanges.length}):\n`;
+        report += `${'─'.repeat(40)}\n`;
+        attendanceChanges.slice(0, 20).forEach(change => {
+            const statusMap = {
+                'present': 'נוכח',
+                'absent': 'נעדר',
+                'arriving': 'מגיע',
+                'leaving': 'יוצא',
+                'counted': 'נספר',
+                'unmarked': 'לא סומן'
+            };
+            report += `${change.name || change.ma} (${change.date}):\n`;
+            report += `  בענן: ${statusMap[change.backup_status] || change.backup_status} → נוכחי: ${statusMap[change.current_status] || change.current_status}\n`;
+        });
+        report += `\n`;
+    }
+
+    // Show added attendance records
+    const addedRecords = diff.attendance_changes.filter(d => d.type === 'added');
+    if (addedRecords.length > 0 && addedRecords.length <= 10) {
+        report += `רשומות נוכחות חדשות (לא היו בגיבוי):\n`;
+        report += `${'─'.repeat(40)}\n`;
+        addedRecords.slice(0, 10).forEach(change => {
+            report += `${change.name || change.ma} (${change.date})\n`;
+        });
+        report += `\n`;
+    }
+
+    // Show removed attendance records
+    const removedRecords = diff.attendance_changes.filter(d => d.type === 'removed');
+    if (removedRecords.length > 0 && removedRecords.length <= 10) {
+        report += `רשומות נוכחות שנמחקו (היו בגיבוי):\n`;
+        report += `${'─'.repeat(40)}\n`;
+        removedRecords.slice(0, 10).forEach(change => {
+            report += `${change.name || change.ma} (${change.date})\n`;
+        });
+        report += `\n`;
+    }
+
+    // Show member changes
+    if (diff.members_added.length > 0) {
+        report += `חיילים חדשים (לא היו בגיבוי):\n`;
+        diff.members_added.forEach(m => {
+            report += `  - ${m.name} (${m.ma})\n`;
+        });
+        report += `\n`;
+    }
+
+    if (diff.members_removed.length > 0) {
+        report += `חיילים שנמחקו (היו בגיבוי):\n`;
+        diff.members_removed.forEach(m => {
+            report += `  - ${m.name} (${m.ma})\n`;
+        });
+    }
+
+    alert(report);
 }
 
 // Legacy function names for compatibility

@@ -1822,7 +1822,7 @@ thead .col-yamam {
     margin-bottom: 10px;
 }
 
-.btn-upload-drive {
+.btn-upload-cloud {
     padding: 8px 16px;
     background: linear-gradient(135deg, #4285f4 0%, #1a73e8 100%);
     color: white;
@@ -1834,12 +1834,12 @@ thead .col-yamam {
     transition: all 0.2s;
 }
 
-.btn-upload-drive:hover {
+.btn-upload-cloud:hover {
     background: linear-gradient(135deg, #1a73e8 0%, #1557b0 100%);
     transform: translateY(-1px);
 }
 
-.btn-upload-drive:disabled {
+.btn-upload-cloud:disabled {
     background: #a0c4ff;
     cursor: not-allowed;
     transform: none;
@@ -1860,16 +1860,16 @@ thead .col-yamam {
     font-weight: 600;
 }
 
-.drive-backup {
+.cloud-backup {
     background: #f0f7ff;
     border: 1px solid #a0c4ff;
 }
 
-.drive-backup:hover {
+.cloud-backup:hover {
     background: #e0efff;
 }
 
-.btn-restore-drive {
+.btn-restore-cloud {
     padding: 6px 12px;
     background: #28a745;
     color: white;
@@ -1880,11 +1880,11 @@ thead .col-yamam {
     transition: all 0.2s;
 }
 
-.btn-restore-drive:hover {
+.btn-restore-cloud:hover {
     background: #218838;
 }
 
-.btn-delete-drive {
+.btn-delete-cloud {
     padding: 6px 12px;
     background: #dc3545;
     color: white;
@@ -1895,8 +1895,28 @@ thead .col-yamam {
     transition: all 0.2s;
 }
 
-.btn-delete-drive:hover {
+.btn-delete-cloud:hover {
     background: #c82333;
+}
+
+.btn-compare-cloud {
+    padding: 6px 12px;
+    background: #17a2b8;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.btn-compare-cloud:hover {
+    background: #138496;
+}
+
+.btn-compare-cloud:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
 }
 
 /* Responsive */
@@ -1918,4 +1938,31 @@ thead .col-yamam {
     header h1 {
         font-size: 1.8rem;
     }
+}
+
+/* Drive Authorization Button */
+.drive-not-configured {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    padding: 20px;
+}
+
+.btn-authorize-drive {
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #4285f4 0%, #1a73e8 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: all 0.2s;
+}
+
+.btn-authorize-drive:hover {
+    background: linear-gradient(135deg, #1a73e8 0%, #1557b0 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(66, 133, 244, 0.4);
 }
