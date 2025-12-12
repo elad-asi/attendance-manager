@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.6.11';
+const FE_VERSION = '0.6.12';
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -181,10 +181,18 @@ async function loadBackendVersion() {
 // ============================================
 
 function updateSheetUI() {
-    // Update sheet ID display
+    // Update sheet ID display - show Google Spreadsheet ID (truncated) for debugging
     const sheetIdDisplay = document.getElementById('sheetIdDisplay');
     if (sheetIdDisplay) {
-        sheetIdDisplay.textContent = `Sheet: ${currentSheetId || '-'}`;
+        // Show Google Spreadsheet ID if available, otherwise show internal ID
+        let displayText = '-';
+        if (currentSpreadsheetId) {
+            // Show first 8 chars of the Google Spreadsheet ID
+            displayText = currentSpreadsheetId.substring(0, 8) + '...';
+        } else if (currentSheetId) {
+            displayText = `DB:${currentSheetId}`;
+        }
+        sheetIdDisplay.textContent = `Sheet: ${displayText}`;
     }
 
     // Start or stop polling based on whether we have an active sheet
