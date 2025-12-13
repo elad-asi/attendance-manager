@@ -119,6 +119,7 @@ def init_database():
         CREATE TABLE IF NOT EXISTS sheets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             spreadsheet_id TEXT NOT NULL,
+            spreadsheet_title TEXT DEFAULT '',
             sheet_name TEXT NOT NULL,
             gdud TEXT DEFAULT '',
             pluga TEXT DEFAULT '',
@@ -129,6 +130,12 @@ def init_database():
             UNIQUE(spreadsheet_id, sheet_name, gdud, pluga)
         )
     ''')
+
+    # Migration: Add spreadsheet_title column if it doesn't exist
+    try:
+        cursor.execute('ALTER TABLE sheets ADD COLUMN spreadsheet_title TEXT DEFAULT ""')
+    except:
+        pass  # Column already exists
 
     # Team members table - linked to a sheet
     cursor.execute('''
@@ -181,7 +188,7 @@ def init_database():
     conn.commit()
     conn.close()
 
-def get_or_create_sheet(spreadsheet_id, sheet_name, gdud='', pluga=''):
+def get_or_create_sheet(spreadsheet_id, sheet_name, gdud='', pluga='', spreadsheet_title=''):
     """Get existing sheet or create a new one, returns sheet_id"""
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -195,12 +202,18 @@ def get_or_create_sheet(spreadsheet_id, sheet_name, gdud='', pluga=''):
     row = cursor.fetchone()
     if row:
         sheet_id = row['id']
+        # Update spreadsheet_title if provided (in case it was missing before)
+        if spreadsheet_title:
+            cursor.execute('''
+                UPDATE sheets SET spreadsheet_title = ? WHERE id = ?
+            ''', (spreadsheet_title, sheet_id))
+            conn.commit()
     else:
         # Create new sheet
         cursor.execute('''
-            INSERT INTO sheets (spreadsheet_id, sheet_name, gdud, pluga)
-            VALUES (?, ?, ?, ?)
-        ''', (spreadsheet_id, sheet_name, gdud, pluga))
+            INSERT INTO sheets (spreadsheet_id, spreadsheet_title, sheet_name, gdud, pluga)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (spreadsheet_id, spreadsheet_title, sheet_name, gdud, pluga))
         sheet_id = cursor.lastrowid
         conn.commit()
 

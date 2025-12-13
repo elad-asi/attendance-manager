@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.6.15';
+const FE_VERSION = '0.8.0';
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -585,9 +585,9 @@ function updateUserDisplay(userInfo) {
     const loggedInUserName = document.getElementById('loggedInUserName');
 
     if (userInfoDisplay && loggedInUserName) {
-        if (userInfo && (userInfo.name || userInfo.email)) {
-            // Show user's name, or email if name is not available
-            loggedInUserName.textContent = userInfo.name || userInfo.email;
+        if (userInfo && userInfo.email) {
+            // Show user's email
+            loggedInUserName.textContent = userInfo.email;
             userInfoDisplay.style.display = 'flex';
         } else {
             userInfoDisplay.style.display = 'none';

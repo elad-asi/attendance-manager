@@ -16,7 +16,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '0.7.0'
+BE_VERSION = '0.8.0'
 
 # ============================================
 # Helper: Resolve Google Identifiers to Sheet ID
