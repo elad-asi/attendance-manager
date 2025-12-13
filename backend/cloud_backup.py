@@ -617,8 +617,16 @@ def list_cloud_backups(filter_sheet_id=None, spreadsheet_id=None):
         backups = []
 
         for backup in index.get('backups', []):
-            # Filter by sheet_id if provided
-            if filter_sheet_id is not None:
+            # Filter by spreadsheet_id if provided (preferred - matches Google Spreadsheet)
+            # This is better than filter_sheet_id because internal DB IDs can change
+            if spreadsheet_id is not None:
+                backup_sheets = backup.get('sheets', [])
+                if backup_sheets:  # Only filter if we have sheet info
+                    backup_spreadsheet_ids = [s.get('spreadsheet_id') for s in backup_sheets]
+                    if spreadsheet_id not in backup_spreadsheet_ids:
+                        continue  # Skip backups from different Google Spreadsheets
+            # Fallback: filter by sheet_id if provided and no spreadsheet_id filter
+            elif filter_sheet_id is not None:
                 backup_sheets = backup.get('sheets', [])
                 # If sheets list is empty, show the backup (it's a full backup)
                 # Otherwise check if this backup contains the requested sheet

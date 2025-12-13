@@ -218,6 +218,20 @@ def get_sheet_by_id(sheet_id):
         return dict(row)
     return None
 
+def get_sheet_id_by_google_identifiers(spreadsheet_id, sheet_name, gdud='', pluga=''):
+    """Get internal sheet ID using Google identifiers (spreadsheet_id + sheet_name + gdud + pluga)"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT id FROM sheets
+        WHERE spreadsheet_id = ? AND sheet_name = ? AND gdud = ? AND pluga = ?
+    ''', (spreadsheet_id, sheet_name, gdud, pluga))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return row['id']
+    return None
+
 def update_sheet_dates(sheet_id, start_date, end_date):
     """Update date range for a sheet"""
     conn = get_db_connection()

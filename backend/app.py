@@ -16,7 +16,37 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '0.6.12'
+BE_VERSION = '0.7.0'
+
+# ============================================
+# Helper: Resolve Google Identifiers to Sheet ID
+# ============================================
+
+def resolve_sheet_id_from_request(req_data=None, query_args=None):
+    """
+    Resolve internal sheet_id from Google identifiers.
+    Accepts either request JSON body or query args.
+    Returns (sheet_id, error_response) tuple - error_response is None if successful
+    """
+    if req_data is None:
+        req_data = {}
+    if query_args is None:
+        query_args = {}
+
+    # Get identifiers from body or query params
+    spreadsheet_id = req_data.get('spreadsheetId') or query_args.get('spreadsheet_id')
+    sheet_name = req_data.get('sheetName') or query_args.get('sheet_name')
+    gdud = req_data.get('gdud', '') or query_args.get('gdud', '')
+    pluga = req_data.get('pluga', '') or query_args.get('pluga', '')
+
+    if not spreadsheet_id or not sheet_name:
+        return None, ({'error': 'Missing spreadsheetId or sheetName'}, 400)
+
+    sheet_id = db.get_sheet_id_by_google_identifiers(spreadsheet_id, sheet_name, gdud, pluga)
+    if not sheet_id:
+        return None, ({'error': 'Sheet not found for given identifiers'}, 404)
+
+    return sheet_id, None
 
 # NOTE: Active users are now tracked in SQLite database (see database.py)
 # This allows multi-worker deployments (like Gunicorn) to share state

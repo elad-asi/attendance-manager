@@ -9,10 +9,29 @@
 <body>
     <div class="container">
         <header>
-            <div class="version-info">
-                <span id="feVersion">FE: 0.0.1</span>
-                <span id="beVersion">BE: Loading...</span>
-                <span id="sheetIdDisplay">Sheet: -</span>
+            <div class="header-top-bar">
+                <div class="version-info">
+                    <span id="feVersion">FE: 0.0.1</span>
+                    <span id="beVersion">BE: Loading...</span>
+                </div>
+                <div class="user-info" id="userInfoDisplay" style="display: none;">
+                    <span class="user-label">מחובר:</span>
+                    <span id="loggedInUserName">-</span>
+                </div>
+            </div>
+            <div class="sheet-info" id="sheetInfoDisplay" style="display: none;">
+                <div class="sheet-info-row">
+                    <span class="sheet-info-label">קובץ:</span>
+                    <span id="spreadsheetTitle">-</span>
+                </div>
+                <div class="sheet-info-row">
+                    <span class="sheet-info-label">גיליון:</span>
+                    <span id="sheetNameDisplay">-</span>
+                </div>
+                <div class="sheet-info-row">
+                    <span class="sheet-info-label">מזהה:</span>
+                    <span id="spreadsheetIdDisplay" class="spreadsheet-id">-</span>
+                </div>
             </div>
             <div class="current-date-display">
                 <span id="currentDate"></span>

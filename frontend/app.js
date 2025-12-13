@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.6.13';
+const FE_VERSION = '0.6.15';
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -59,6 +59,8 @@ let sortConfig = {
 let tokenClient = null;
 let accessToken = null;
 let currentSpreadsheetId = null;
+let currentSpreadsheetTitle = null;  // Name of the Google Spreadsheet file
+let currentSheetName = null;         // Name of the specific sheet (tab) within the file
 
 // Google OAuth Configuration
 const GOOGLE_CLIENT_ID = '651831609522-bvrgmop9hmdghlrn2tqm1hv0dmkhu933.apps.googleusercontent.com';
@@ -181,18 +183,33 @@ async function loadBackendVersion() {
 // ============================================
 
 function updateSheetUI() {
-    // Update sheet ID display - show Google Spreadsheet ID (truncated) for debugging
-    const sheetIdDisplay = document.getElementById('sheetIdDisplay');
-    if (sheetIdDisplay) {
-        // Show Google Spreadsheet ID if available, otherwise show internal ID
-        let displayText = '-';
-        if (currentSpreadsheetId) {
-            // Show first 8 chars of the Google Spreadsheet ID
-            displayText = currentSpreadsheetId.substring(0, 8) + '...';
-        } else if (currentSheetId) {
-            displayText = `DB:${currentSheetId}`;
+    // Update sheet info display - show file name, sheet name, and unique ID
+    const sheetInfoDisplay = document.getElementById('sheetInfoDisplay');
+    const spreadsheetTitleEl = document.getElementById('spreadsheetTitle');
+    const sheetNameDisplayEl = document.getElementById('sheetNameDisplay');
+    const spreadsheetIdDisplayEl = document.getElementById('spreadsheetIdDisplay');
+
+    if (sheetInfoDisplay && currentSheetId) {
+        // Show the sheet info section
+        sheetInfoDisplay.style.display = 'block';
+
+        // Update spreadsheet title (file name)
+        if (spreadsheetTitleEl) {
+            spreadsheetTitleEl.textContent = currentSpreadsheetTitle || '-';
         }
-        sheetIdDisplay.textContent = `Sheet: ${displayText}`;
+
+        // Update sheet name
+        if (sheetNameDisplayEl) {
+            sheetNameDisplayEl.textContent = currentSheetName || '-';
+        }
+
+        // Update spreadsheet ID (unique identifier)
+        if (spreadsheetIdDisplayEl) {
+            spreadsheetIdDisplayEl.textContent = currentSpreadsheetId || '-';
+        }
+    } else if (sheetInfoDisplay) {
+        // Hide the sheet info section when no sheet is loaded
+        sheetInfoDisplay.style.display = 'none';
     }
 
     // Start or stop polling based on whether we have an active sheet
@@ -223,7 +240,7 @@ function startPolling() {
 
     // Start polling
     pollIntervalId = setInterval(pollForUpdates, POLL_INTERVAL_MS);
-    console.log('Polling started (every 10 seconds)');
+    console.log('Polling started (every 3 seconds)');
 
     // Do an initial poll immediately
     pollForUpdates();
@@ -354,6 +371,8 @@ function disconnectCurrentSheet() {
     // Clear local state
     currentSheetId = null;
     currentSpreadsheetId = null;
+    currentSpreadsheetTitle = null;
+    currentSheetName = null;
     currentUserEmail = null;
     teamMembers = [];
     attendanceData = {};
@@ -372,6 +391,7 @@ function disconnectCurrentSheet() {
     localStorage.removeItem('google_access_token');
     localStorage.removeItem('google_user_info');
     updateAuthUI(false);
+    updateUserDisplay(null);  // Hide user display
 
     // Reset UI
     document.getElementById('sheetsUrl').value = '';
@@ -431,6 +451,20 @@ async function loadFromBackend() {
                     document.getElementById('endDate').value = response.sheet.end_date;
                     // Restore Google Spreadsheet ID for display
                     currentSpreadsheetId = response.sheet.spreadsheet_id || null;
+                    currentSheetName = response.sheet.sheet_name || null;
+                }
+
+                // Restore sheet info from localStorage (for title which isn't stored in DB)
+                const storedSheetInfo = localStorage.getItem('current_sheet_info');
+                if (storedSheetInfo) {
+                    const sheetInfo = JSON.parse(storedSheetInfo);
+                    currentSpreadsheetTitle = sheetInfo.spreadsheetTitle || null;
+                    if (!currentSheetName) {
+                        currentSheetName = sheetInfo.sheetName || null;
+                    }
+                    if (!currentSpreadsheetId) {
+                        currentSpreadsheetId = sheetInfo.spreadsheetId || null;
+                    }
                 }
             }
         }
@@ -500,6 +534,14 @@ function initializeGoogleAuth() {
         accessToken = storedToken;
         updateAuthUI(true);
         document.getElementById('fetchSheetsBtn').disabled = false;
+
+        // Restore user info display from localStorage
+        const storedUserInfo = localStorage.getItem('google_user_info');
+        if (storedUserInfo) {
+            const userInfo = JSON.parse(storedUserInfo);
+            currentUserEmail = userInfo.email || null;
+            updateUserDisplay(userInfo);
+        }
     }
 }
 
@@ -530,8 +572,26 @@ async function fetchUserInfo() {
 
         localStorage.setItem('google_user_info', JSON.stringify(userInfo));
         currentUserEmail = userInfo.email || null;
+
+        // Update user display in UI
+        updateUserDisplay(userInfo);
     } catch (error) {
         console.error('Error fetching user info:', error);
+    }
+}
+
+function updateUserDisplay(userInfo) {
+    const userInfoDisplay = document.getElementById('userInfoDisplay');
+    const loggedInUserName = document.getElementById('loggedInUserName');
+
+    if (userInfoDisplay && loggedInUserName) {
+        if (userInfo && (userInfo.name || userInfo.email)) {
+            // Show user's name, or email if name is not available
+            loggedInUserName.textContent = userInfo.name || userInfo.email;
+            userInfoDisplay.style.display = 'flex';
+        } else {
+            userInfoDisplay.style.display = 'none';
+        }
     }
 }
 
@@ -629,6 +689,9 @@ async function fetchSheetsList() {
             option.textContent = sheet.title;
             sheetSelect.appendChild(option);
         });
+
+        // Store spreadsheet title for later display
+        currentSpreadsheetTitle = response.title;
 
         // Show dropdown
         document.getElementById('sheetSelectRow').style.display = 'flex';
@@ -898,9 +961,12 @@ async function confirmColumnMapping() {
 
         // Store sheet ID and info
         currentSheetId = loadResponse.sheetId;
+        currentSheetName = sheetName;  // Set the current sheet name for display
         localStorage.setItem('current_sheet_id', currentSheetId);
         localStorage.setItem('current_sheet_info', JSON.stringify({
             sheetName: sheetName,
+            spreadsheetTitle: currentSpreadsheetTitle,
+            spreadsheetId: currentSpreadsheetId,
             gdud: gdud,
             pluga: pluga
         }));
