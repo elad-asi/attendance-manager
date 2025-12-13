@@ -47,7 +47,7 @@ def generate_session_token():
 def send_verification_email(to_email, code):
     """Send verification code email"""
     if not SENDER_APP_PASSWORD:
-        print("WARNING: GMAIL_APP_PASSWORD not set, cannot send email")
+        print("WARNING: GMAIL_APP_PASSWORD not set, skipping email send")
         return False, "Email service not configured"
 
     try:
@@ -94,8 +94,8 @@ def send_verification_email(to_email, code):
         msg.attach(part1)
         msg.attach(part2)
 
-        # Send email
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        # Send email with timeout
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
             server.starttls()
             server.login(SENDER_EMAIL, SENDER_APP_PASSWORD)
             server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
@@ -106,6 +106,9 @@ def send_verification_email(to_email, code):
     except smtplib.SMTPAuthenticationError:
         print("SMTP authentication failed - check app password")
         return False, "Email authentication failed"
+    except TimeoutError:
+        print("SMTP connection timed out")
+        return False, "Email service timeout"
     except Exception as e:
         print(f"Error sending email: {e}")
         return False, str(e)
