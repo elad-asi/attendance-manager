@@ -15,9 +15,8 @@ from email.mime.multipart import MIMEMultipart
 SMTP_SERVER = 'smtp.gmail.com'
 SMTP_PORT = 587
 SENDER_EMAIL = 'asi.michal.elad@gmail.com'
-# App password should be set in environment variable for security
-# Generate one at: https://myaccount.google.com/apppasswords
-SENDER_APP_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', '')
+# App password - can be overridden by environment variable
+SENDER_APP_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', 'sgtudwosdgxqbbvn')
 
 # Store pending verification codes (in production, use Redis or database)
 # Format: {email: {'code': '123456', 'expires': timestamp, 'attempts': 0}}
