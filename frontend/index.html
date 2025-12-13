@@ -7,6 +7,42 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <!-- Login Screen Overlay -->
+    <div id="loginOverlay" class="login-overlay">
+        <div class="login-container">
+            <div class="login-header">
+                <h1>מנהל נוכחות</h1>
+                <p>התחבר באמצעות מייל</p>
+            </div>
+
+            <!-- Step 1: Email Input -->
+            <div id="loginStep1" class="login-step">
+                <div class="login-form">
+                    <label for="loginEmail">כתובת מייל</label>
+                    <input type="email" id="loginEmail" placeholder="your@email.com" autocomplete="email" />
+                    <button id="sendCodeBtn" class="btn-login">שלח קוד אימות</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Code Verification -->
+            <div id="loginStep2" class="login-step" style="display: none;">
+                <div class="login-form">
+                    <p class="login-info">קוד נשלח ל: <strong id="sentToEmail"></strong></p>
+                    <label for="verificationCode">הזן קוד אימות</label>
+                    <input type="text" id="verificationCode" placeholder="123456" maxlength="6" autocomplete="one-time-code" />
+                    <button id="verifyCodeBtn" class="btn-login">אמת והתחבר</button>
+                    <button id="backToEmailBtn" class="btn-secondary">חזור</button>
+                </div>
+            </div>
+
+            <div id="loginError" class="login-error" style="display: none;"></div>
+            <div id="loginLoading" class="login-loading" style="display: none;">
+                <span class="spinner"></span>
+                <span>מעבד...</span>
+            </div>
+        </div>
+    </div>
+
     <div class="container">
         <header>
             <div class="version-info">
@@ -18,14 +54,16 @@
                     <span class="sheet-info-item"><span class="sheet-info-label">קובץ:</span> <span id="spreadsheetTitle">-</span></span>
                     <span class="sheet-info-separator">|</span>
                     <span class="sheet-info-item"><span class="sheet-info-label">גיליון:</span> <span id="sheetNameDisplay">-</span></span>
-                </div>
-                <div class="user-info" id="userInfoDisplay" style="display: none;">
-                    <span class="user-label">מחובר:</span>
-                    <span id="loggedInUserName">-</span>
+                    <span class="sheet-info-separator">|</span>
+                    <span class="sheet-info-item"><span class="sheet-info-label">Google ID:</span> <span id="spreadsheetIdDisplay">-</span></span>
                 </div>
             </div>
             <div class="current-date-display">
                 <span id="currentDate"></span>
+            </div>
+            <div class="logged-in-user" id="loggedInUserDisplay" style="display: none;">
+                <span class="user-email" id="loggedInEmail"></span>
+                <button class="btn-logout" id="logoutBtn">התנתק</button>
             </div>
             <h1>📋 מנהל נוכחות</h1>
             <p class="subtitle">מעקב נוכחות צוות</p>
@@ -42,7 +80,13 @@
             <div class="google-sheets-area">
                 <div class="sheets-header">
                     <h3>📊 ייבוא מ-Google Sheets</h3>
-                    <button id="googleConnectBtn" class="btn-connect-inline">התחבר</button>
+                    <div class="sheets-header-right">
+                        <div class="user-info" id="userInfoDisplay" style="display: none;">
+                            <span class="user-label">מחובר:</span>
+                            <span id="loggedInUserName">-</span>
+                        </div>
+                        <button id="googleConnectBtn" class="btn-connect-inline">התחבר</button>
+                    </div>
                 </div>
 
                 <div class="sheets-form">

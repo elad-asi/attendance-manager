@@ -64,7 +64,7 @@ let currentSheetName = null;         // Name of the specific sheet (tab) within 
 
 // Google OAuth Configuration
 const GOOGLE_CLIENT_ID = '651831609522-bvrgmop9hmdghlrn2tqm1hv0dmkhu933.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.file';
+const SCOPES = 'https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email';
 
 // Attendance statuses
 const STATUSES = ['unmarked', 'present', 'absent', 'arriving', 'leaving', 'counted'];
@@ -145,6 +145,288 @@ function showSaveToast(message = 'נשמר בשרת', isError = false) {
 }
 
 // ============================================
+// Email Authentication Functions
+// ============================================
+
+// Auth state
+let authSessionToken = localStorage.getItem('authSessionToken') || null;
+let authUserEmail = localStorage.getItem('authUserEmail') || null;
+
+function showLoginError(message) {
+    const errorEl = document.getElementById('loginError');
+    errorEl.textContent = message;
+    errorEl.style.display = 'block';
+}
+
+function hideLoginError() {
+    document.getElementById('loginError').style.display = 'none';
+}
+
+function showLoginLoading(show) {
+    document.getElementById('loginLoading').style.display = show ? 'flex' : 'none';
+}
+
+function showLoginStep(step) {
+    document.getElementById('loginStep1').style.display = step === 1 ? 'block' : 'none';
+    document.getElementById('loginStep2').style.display = step === 2 ? 'block' : 'none';
+}
+
+async function requestVerificationCode() {
+    const emailInput = document.getElementById('loginEmail');
+    const email = emailInput.value.trim();
+
+    if (!email) {
+        showLoginError('נא להזין כתובת מייל');
+        return;
+    }
+
+    hideLoginError();
+    showLoginLoading(true);
+    document.getElementById('sendCodeBtn').disabled = true;
+
+    try {
+        const response = await fetch(`${API_BASE}/auth/request-code`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Store email for verification step
+            document.getElementById('sentToEmail').textContent = email;
+            showLoginStep(2);
+            document.getElementById('verificationCode').focus();
+            // Show dev mode message if present
+            if (data.message && data.message.includes('development')) {
+                showLoginError(data.message);
+            }
+        } else {
+            showLoginError(data.error || 'שגיאה בשליחת הקוד');
+        }
+    } catch (error) {
+        console.error('Request code error:', error);
+        showLoginError('שגיאת תקשורת - נסה שוב');
+    } finally {
+        showLoginLoading(false);
+        document.getElementById('sendCodeBtn').disabled = false;
+    }
+}
+
+async function verifyCode() {
+    const email = document.getElementById('sentToEmail').textContent;
+    const code = document.getElementById('verificationCode').value.trim();
+
+    if (!code) {
+        showLoginError('נא להזין קוד אימות');
+        return;
+    }
+
+    hideLoginError();
+    showLoginLoading(true);
+    document.getElementById('verifyCodeBtn').disabled = true;
+
+    try {
+        const response = await fetch(`${API_BASE}/auth/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, code })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Store session
+            authSessionToken = data.sessionToken;
+            authUserEmail = data.email;
+            localStorage.setItem('authSessionToken', authSessionToken);
+            localStorage.setItem('authUserEmail', authUserEmail);
+
+            // Also use this email as the currentUserEmail for heartbeat
+            currentUserEmail = authUserEmail;
+
+            // Hide login, show app
+            onLoginSuccess();
+        } else {
+            showLoginError(data.error || 'קוד שגוי');
+        }
+    } catch (error) {
+        console.error('Verify code error:', error);
+        showLoginError('שגיאת תקשורת - נסה שוב');
+    } finally {
+        showLoginLoading(false);
+        document.getElementById('verifyCodeBtn').disabled = false;
+    }
+}
+
+function onLoginSuccess() {
+    // Hide login overlay
+    document.getElementById('loginOverlay').classList.add('hidden');
+
+    // Show logged-in user in header
+    document.getElementById('loggedInEmail').textContent = authUserEmail;
+    document.getElementById('loggedInUserDisplay').style.display = 'flex';
+
+    // Set currentUserEmail for heartbeat
+    currentUserEmail = authUserEmail;
+
+    // Initialize the app
+    initializeApp();
+}
+
+async function validateExistingSession() {
+    if (!authSessionToken) {
+        return false;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/auth/validate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionToken: authSessionToken })
+        });
+
+        const data = await response.json();
+
+        if (data.success && data.valid) {
+            authUserEmail = data.email;
+            localStorage.setItem('authUserEmail', authUserEmail);
+            return true;
+        } else {
+            // Clear invalid session
+            clearAuthSession();
+            return false;
+        }
+    } catch (error) {
+        console.error('Session validation error:', error);
+        return false;
+    }
+}
+
+async function logout() {
+    try {
+        await fetch(`${API_BASE}/auth/logout`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionToken: authSessionToken })
+        });
+    } catch (error) {
+        console.error('Logout error:', error);
+    }
+
+    clearAuthSession();
+
+    // Show login screen
+    document.getElementById('loginOverlay').classList.remove('hidden');
+    document.getElementById('loggedInUserDisplay').style.display = 'none';
+
+    // Reset login form
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('verificationCode').value = '';
+    showLoginStep(1);
+    hideLoginError();
+
+    // Stop polling
+    if (pollIntervalId) {
+        clearInterval(pollIntervalId);
+        pollIntervalId = null;
+    }
+}
+
+function clearAuthSession() {
+    authSessionToken = null;
+    authUserEmail = null;
+    localStorage.removeItem('authSessionToken');
+    localStorage.removeItem('authUserEmail');
+}
+
+function initializeLoginListeners() {
+    // Send code button
+    document.getElementById('sendCodeBtn').addEventListener('click', requestVerificationCode);
+
+    // Verify code button
+    document.getElementById('verifyCodeBtn').addEventListener('click', verifyCode);
+
+    // Back to email button
+    document.getElementById('backToEmailBtn').addEventListener('click', function() {
+        showLoginStep(1);
+        hideLoginError();
+    });
+
+    // Logout button
+    document.getElementById('logoutBtn').addEventListener('click', logout);
+
+    // Allow Enter key to submit
+    document.getElementById('loginEmail').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            requestVerificationCode();
+        }
+    });
+
+    document.getElementById('verificationCode').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            verifyCode();
+        }
+    });
+}
+
+function initializeApp() {
+    // Set FE version
+    document.getElementById('feVersion').textContent = `FE: ${FE_VERSION}`;
+
+    // Load BE version
+    loadBackendVersion();
+
+    // Display current date
+    updateCurrentDateDisplay();
+
+    // Initialize Google Auth
+    initializeGoogleAuth();
+
+    // Load data from backend
+    loadFromBackend();
+
+    // Google Connect/Disconnect button (single button that changes state)
+    document.getElementById('googleConnectBtn').addEventListener('click', handleGoogleConnectClick);
+
+    // Google Sheets buttons
+    document.getElementById('fetchSheetsBtn').addEventListener('click', fetchSheetsList);
+    document.getElementById('sheetSelect').addEventListener('change', handleSheetSelect);
+    document.getElementById('loadFromSheets').addEventListener('click', loadFromGoogleSheets);
+
+    // Enable fetch button when URL is entered and user is signed in
+    document.getElementById('sheetsUrl').addEventListener('input', function() {
+        document.getElementById('fetchSheetsBtn').disabled = !accessToken || !this.value.trim();
+    });
+
+    // Update load button state when gdud/pluga change
+    document.getElementById('inputGdud').addEventListener('input', updateLoadButtonState);
+    document.getElementById('inputPluga').addEventListener('input', updateLoadButtonState);
+
+    // XLS Upload
+    document.getElementById('xlsUpload').addEventListener('change', handleXLSUpload);
+
+    // Date range
+    document.getElementById('applyDates').addEventListener('click', applyDateRange);
+
+    // Export
+    document.getElementById('exportData').addEventListener('click', exportData);
+
+    // Column mapping modal buttons
+    document.getElementById('confirmMappingBtn').addEventListener('click', confirmColumnMapping);
+    document.getElementById('cancelMappingBtn').addEventListener('click', hideColumnMappingModal);
+
+    // Toggle column visibility
+    document.getElementById('toggleMiktzoa').addEventListener('click', toggleMiktzoaColumn);
+
+    // Backup modal buttons
+    document.getElementById('backupBtn').addEventListener('click', openBackupModal);
+    document.getElementById('closeBackupModalBtn').addEventListener('click', closeBackupModal);
+    document.getElementById('restoreBackupBtn').addEventListener('click', restoreBackup);
+}
+
+// ============================================
 // API Functions
 // ============================================
 
@@ -183,7 +465,7 @@ async function loadBackendVersion() {
 // ============================================
 
 function updateSheetUI() {
-    // Update sheet info display - show file name, sheet name, and unique ID
+    // Update sheet info display - show file name, sheet name, and Google Spreadsheet ID
     const sheetInfoDisplay = document.getElementById('sheetInfoDisplay');
     const spreadsheetTitleEl = document.getElementById('spreadsheetTitle');
     const sheetNameDisplayEl = document.getElementById('sheetNameDisplay');
@@ -203,7 +485,7 @@ function updateSheetUI() {
             sheetNameDisplayEl.textContent = currentSheetName || '-';
         }
 
-        // Update spreadsheet ID (unique identifier)
+        // Update Google Spreadsheet ID
         if (spreadsheetIdDisplayEl) {
             spreadsheetIdDisplayEl.textContent = currentSpreadsheetId || '-';
         }
@@ -568,13 +850,34 @@ async function fetchUserInfo() {
         const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
+
+        // Check if token is invalid/expired (401) - need to re-authenticate with new scopes
+        if (response.status === 401) {
+            console.log('Token missing userinfo scope - revoking and requesting re-authentication');
+            // Revoke the token to force Google to issue a new one with all scopes
+            if (accessToken && google.accounts && google.accounts.oauth2) {
+                google.accounts.oauth2.revoke(accessToken, () => {
+                    console.log('Token revoked');
+                });
+            }
+            // Clear invalid token
+            localStorage.removeItem('google_access_token');
+            localStorage.removeItem('google_user_info');
+            accessToken = null;
+            updateAuthUI(false);
+            updateUserDisplay(null);
+            // User info won't be shown, but they can still use Sheets with the current token
+            // They'll need to click "התחבר" again to get email scope
+            return;
+        }
+
         const userInfo = await response.json();
 
-        localStorage.setItem('google_user_info', JSON.stringify(userInfo));
-        currentUserEmail = userInfo.email || null;
-
-        // Update user display in UI
-        updateUserDisplay(userInfo);
+        if (userInfo.email) {
+            localStorage.setItem('google_user_info', JSON.stringify(userInfo));
+            currentUserEmail = userInfo.email;
+            updateUserDisplay(userInfo);
+        }
     } catch (error) {
         console.error('Error fetching user info:', error);
     }
@@ -621,7 +924,8 @@ function handleGoogleConnectClick() {
 
 function handleGoogleSignIn() {
     if (tokenClient) {
-        tokenClient.requestAccessToken();
+        // Force consent to get new scopes (like userinfo.email)
+        tokenClient.requestAccessToken({prompt: 'consent'});
     } else {
         showSheetsStatus('שגיאה: Google Identity Services לא נטען', 'error');
     }
@@ -2310,57 +2614,24 @@ const uploadToDrive = uploadToCloud;
 // Event Listeners
 // ============================================
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Set FE version
-    document.getElementById('feVersion').textContent = `FE: ${FE_VERSION}`;
+document.addEventListener('DOMContentLoaded', async function() {
+    // Always initialize login listeners
+    initializeLoginListeners();
 
-    // Load BE version
-    loadBackendVersion();
+    // Check for existing valid session
+    const hasValidSession = await validateExistingSession();
 
-    // Display current date
-    updateCurrentDateDisplay();
+    if (hasValidSession) {
+        // User already logged in - hide login, show app
+        document.getElementById('loginOverlay').classList.add('hidden');
+        document.getElementById('loggedInEmail').textContent = authUserEmail;
+        document.getElementById('loggedInUserDisplay').style.display = 'flex';
+        currentUserEmail = authUserEmail;
 
-    // Initialize Google Auth
-    initializeGoogleAuth();
-
-    // Load data from backend
-    loadFromBackend();
-
-    // Google Connect/Disconnect button (single button that changes state)
-    document.getElementById('googleConnectBtn').addEventListener('click', handleGoogleConnectClick);
-
-    // Google Sheets buttons
-    document.getElementById('fetchSheetsBtn').addEventListener('click', fetchSheetsList);
-    document.getElementById('sheetSelect').addEventListener('change', handleSheetSelect);
-    document.getElementById('loadFromSheets').addEventListener('click', loadFromGoogleSheets);
-
-    // Enable fetch button when URL is entered and user is signed in
-    document.getElementById('sheetsUrl').addEventListener('input', function() {
-        document.getElementById('fetchSheetsBtn').disabled = !accessToken || !this.value.trim();
-    });
-
-    // Update load button state when gdud/pluga change
-    document.getElementById('inputGdud').addEventListener('input', updateLoadButtonState);
-    document.getElementById('inputPluga').addEventListener('input', updateLoadButtonState);
-
-    // XLS Upload
-    document.getElementById('xlsUpload').addEventListener('change', handleXLSUpload);
-
-    // Date range
-    document.getElementById('applyDates').addEventListener('click', applyDateRange);
-
-    // Export
-    document.getElementById('exportData').addEventListener('click', exportData);
-
-    // Column mapping modal buttons
-    document.getElementById('confirmMappingBtn').addEventListener('click', confirmColumnMapping);
-    document.getElementById('cancelMappingBtn').addEventListener('click', hideColumnMappingModal);
-
-    // Toggle column visibility
-    document.getElementById('toggleMiktzoa').addEventListener('click', toggleMiktzoaColumn);
-
-    // Backup modal buttons
-    document.getElementById('backupBtn').addEventListener('click', openBackupModal);
-    document.getElementById('closeBackupModalBtn').addEventListener('click', closeBackupModal);
-    document.getElementById('restoreBackupBtn').addEventListener('click', restoreBackup);
+        // Initialize the main app
+        initializeApp();
+    } else {
+        // Show login screen (it's already visible by default)
+        document.getElementById('loginOverlay').classList.remove('hidden');
+    }
 });

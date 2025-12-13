@@ -11,6 +11,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import database as db
 import cloud_backup
+import email_auth
 
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
@@ -501,6 +502,77 @@ def run_migration():
         return jsonify({'success': True, 'message': 'Migration completed'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# ============================================
+# Email Authentication API
+# ============================================
+
+@app.route('/api/auth/request-code', methods=['POST'])
+def request_auth_code():
+    """Send verification code to email"""
+    req = request.json or {}
+    email = req.get('email', '').strip()
+
+    if not email:
+        return jsonify({'success': False, 'error': 'נא להזין כתובת מייל'}), 400
+
+    # Basic email validation
+    if '@' not in email or '.' not in email:
+        return jsonify({'success': False, 'error': 'כתובת מייל לא תקינה'}), 400
+
+    success, message = email_auth.request_verification_code(email)
+
+    if success:
+        return jsonify({'success': True, 'message': message})
+    else:
+        return jsonify({'success': False, 'error': message}), 500
+
+
+@app.route('/api/auth/verify', methods=['POST'])
+def verify_auth_code():
+    """Verify code and create session"""
+    req = request.json or {}
+    email = req.get('email', '').strip()
+    code = req.get('code', '').strip()
+
+    if not email or not code:
+        return jsonify({'success': False, 'error': 'נא להזין מייל וקוד'}), 400
+
+    success, session_token, message = email_auth.verify_code(email, code)
+
+    if success:
+        return jsonify({
+            'success': True,
+            'sessionToken': session_token,
+            'email': email,
+            'message': message
+        })
+    else:
+        return jsonify({'success': False, 'error': message}), 401
+
+
+@app.route('/api/auth/validate', methods=['POST'])
+def validate_auth_session():
+    """Validate session token"""
+    req = request.json or {}
+    session_token = req.get('sessionToken', '')
+
+    email = email_auth.validate_session(session_token)
+
+    if email:
+        return jsonify({'success': True, 'valid': True, 'email': email})
+    else:
+        return jsonify({'success': True, 'valid': False}), 200
+
+
+@app.route('/api/auth/logout', methods=['POST'])
+def auth_logout():
+    """Logout and invalidate session"""
+    req = request.json or {}
+    session_token = req.get('sessionToken', '')
+
+    email_auth.logout(session_token)
+    return jsonify({'success': True, 'message': 'התנתקת בהצלחה'})
 
 # ============================================
 # Active Users Tracking (Database-backed for multi-worker support)
