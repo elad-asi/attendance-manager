@@ -32,10 +32,13 @@ CODE_EXPIRY_SECONDS = 300  # 5 minutes
 SESSION_EXPIRY_SECONDS = 86400 * 7  # 7 days
 MAX_ATTEMPTS = 3
 
+# Fixed access code - only users who know this can login
+FIXED_ACCESS_CODE = '968500'
+
 
 def generate_code():
-    """Generate a random 6-digit verification code"""
-    return ''.join(random.choices(string.digits, k=CODE_LENGTH))
+    """Return the fixed access code"""
+    return FIXED_ACCESS_CODE
 
 
 def generate_session_token():
@@ -117,26 +120,19 @@ def request_verification_code(email):
     """Request a new verification code for an email address"""
     email = email.lower().strip()
 
-    # Generate code
-    code = generate_code()
+    # Use fixed access code - no email sending needed
+    code = FIXED_ACCESS_CODE
     expires = time.time() + CODE_EXPIRY_SECONDS
 
-    # Store code
+    # Store code for this email
     pending_codes[email] = {
         'code': code,
         'expires': expires,
         'attempts': 0
     }
 
-    # Send email
-    success, message = send_verification_email(email, code)
-
-    if success:
-        return True, "קוד אימות נשלח למייל"
-    else:
-        # For development - if email fails, return the code in console
-        print(f"DEV MODE: Verification code for {email}: {code}")
-        return True, f"קוד אימות: {code} (development mode)"
+    print(f"Access code requested for {email}")
+    return True, "הזן את קוד הגישה"
 
 
 def verify_code(email, code):

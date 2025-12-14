@@ -12,25 +12,25 @@
         <div class="login-container">
             <div class="login-header">
                 <h1>מנהל נוכחות</h1>
-                <p>התחבר באמצעות מייל</p>
+                <p>כניסה למערכת</p>
             </div>
 
             <!-- Step 1: Email Input -->
             <div id="loginStep1" class="login-step">
                 <div class="login-form">
-                    <label for="loginEmail">כתובת מייל</label>
+                    <label for="loginEmail">כתובת מייל (לזיהוי)</label>
                     <input type="email" id="loginEmail" placeholder="your@email.com" autocomplete="email" />
-                    <button id="sendCodeBtn" class="btn-login">שלח קוד אימות</button>
+                    <button id="sendCodeBtn" class="btn-login">המשך</button>
                 </div>
             </div>
 
             <!-- Step 2: Code Verification -->
             <div id="loginStep2" class="login-step" style="display: none;">
                 <div class="login-form">
-                    <p class="login-info">קוד נשלח ל: <strong id="sentToEmail"></strong></p>
-                    <label for="verificationCode">הזן קוד אימות</label>
-                    <input type="text" id="verificationCode" placeholder="123456" maxlength="6" autocomplete="one-time-code" />
-                    <button id="verifyCodeBtn" class="btn-login">אמת והתחבר</button>
+                    <p class="login-info">משתמש: <strong id="sentToEmail"></strong></p>
+                    <label for="verificationCode">הזן קוד גישה</label>
+                    <input type="text" id="verificationCode" placeholder="******" maxlength="6" autocomplete="one-time-code" />
+                    <button id="verifyCodeBtn" class="btn-login">התחבר</button>
                     <button id="backToEmailBtn" class="btn-secondary">חזור</button>
                 </div>
             </div>
