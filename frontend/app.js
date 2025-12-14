@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.9.1';
+const FE_VERSION = '0.9.5';
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -703,9 +703,15 @@ async function loadFromBackend() {
         }
 
         // Load skipped columns preference (includes both permanent and user-toggled)
+        // Default: hide miktzoaTzvai column
         const storedSkippedColumns = localStorage.getItem('skipped_columns');
         if (storedSkippedColumns) {
-            skippedColumns = JSON.parse(storedSkippedColumns);
+            const parsed = JSON.parse(storedSkippedColumns);
+            // Use default if localStorage is empty array (fresh user)
+            skippedColumns = parsed.length > 0 ? parsed : ['miktzoaTzvai'];
+        } else {
+            // No localStorage - use default
+            skippedColumns = ['miktzoaTzvai'];
         }
 
         // Check if we have a stored sheet ID
