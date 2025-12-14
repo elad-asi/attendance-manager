@@ -49,15 +49,6 @@
                 <span id="feVersion">FE: 0.0.1</span>
                 <span id="beVersion">BE: Loading...</span>
             </div>
-            <div class="header-middle-info">
-                <div class="sheet-info" id="sheetInfoDisplay" style="display: none;">
-                    <span class="sheet-info-item"><span class="sheet-info-label">קובץ:</span> <span id="spreadsheetTitle">-</span></span>
-                    <span class="sheet-info-separator">|</span>
-                    <span class="sheet-info-item"><span class="sheet-info-label">גיליון:</span> <span id="sheetNameDisplay">-</span></span>
-                    <span class="sheet-info-separator">|</span>
-                    <span class="sheet-info-item"><span class="sheet-info-label">Google ID:</span> <span id="spreadsheetIdDisplay">-</span></span>
-                </div>
-            </div>
             <div class="current-date-display">
                 <span id="currentDate"></span>
             </div>
@@ -68,6 +59,15 @@
             <h1>📋 מנהל נוכחות</h1>
             <p class="subtitle">מעקב נוכחות צוות</p>
         </header>
+
+        <!-- Sheet Info Bar - below header -->
+        <div class="sheet-info-bar" id="sheetInfoDisplay" style="display: none;">
+            <span class="sheet-info-item"><span class="sheet-info-label">קובץ:</span> <span id="spreadsheetTitle">-</span></span>
+            <span class="sheet-info-separator">|</span>
+            <span class="sheet-info-item"><span class="sheet-info-label">גיליון:</span> <span id="sheetNameDisplay">-</span></span>
+            <span class="sheet-info-separator">|</span>
+            <span class="sheet-info-item"><span class="sheet-info-label">Google ID:</span> <span id="spreadsheetIdDisplay">-</span></span>
+        </div>
 
         <section class="upload-section">
             <div class="section-header" onclick="toggleUploadSection()">

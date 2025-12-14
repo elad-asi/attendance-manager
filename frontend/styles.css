@@ -138,6 +138,34 @@ header h1 {
     font-size: 1.1rem;
 }
 
+/* Sheet Info Bar - below header */
+.sheet-info-bar {
+    background: linear-gradient(135deg, #34495e 0%, #4a6278 100%);
+    color: white;
+    padding: 10px 30px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    font-size: 0.9rem;
+    flex-wrap: wrap;
+}
+
+.sheet-info-bar .sheet-info-item {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.sheet-info-bar .sheet-info-label {
+    font-weight: bold;
+    opacity: 0.8;
+}
+
+.sheet-info-bar .sheet-info-separator {
+    opacity: 0.4;
+}
+
 /* Active Users Display */
 .active-users-container {
     background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
