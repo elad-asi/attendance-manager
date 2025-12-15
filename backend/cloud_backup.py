@@ -907,3 +907,40 @@ def delete_cloud_backup(bin_id):
 
     except Exception as e:
         return {'success': False, 'error': str(e)}
+
+
+def clear_all_cloud_backups():
+    """Clear all backup references from the cloud index (reset to empty)"""
+    api_key = get_api_key()
+    if not api_key:
+        return {'success': False, 'error': 'Cloud backup not configured'}
+
+    try:
+        # Use the hardcoded index bin ID
+        index_bin_id = os.environ.get('JSONBIN_INDEX_BIN_ID') or HARDCODED_INDEX_BIN_ID
+
+        # Clear the index by setting it to empty
+        empty_index = {'backups': [], 'cleared_at': datetime.now().isoformat()}
+
+        headers = _get_headers()
+        response = requests.put(
+            f'{JSONBIN_API_URL}/b/{index_bin_id}',
+            headers=headers,
+            json=empty_index
+        )
+
+        # Also clear local cache files
+        for cache_file in [INDEX_FILE, INDEX_BIN_CACHE_FILE, LEGACY_INDEX_BIN_ID_FILE]:
+            if os.path.exists(cache_file):
+                try:
+                    os.remove(cache_file)
+                except:
+                    pass
+
+        if response.status_code == 200:
+            return {'success': True, 'message': 'All cloud backup references cleared'}
+        else:
+            return {'success': False, 'error': f'Failed to clear index: {response.text}'}
+
+    except Exception as e:
+        return {'success': False, 'error': str(e)}

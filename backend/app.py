@@ -802,6 +802,14 @@ def compare_with_cloud_backup():
         return jsonify(result)
     return jsonify(result), 400
 
+@app.route('/api/cloud-backups/clear-all', methods=['POST'])
+def clear_all_cloud_backups():
+    """Clear all cloud backup references (reset index to empty)"""
+    result = cloud_backup.clear_all_cloud_backups()
+    if result['success']:
+        return jsonify(result)
+    return jsonify(result), 400
+
 # ============================================
 # Auto-backup Background Thread
 # ============================================
