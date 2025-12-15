@@ -516,6 +516,25 @@ def debug_sync_status():
         'server_time': db.get_server_timestamp()
     })
 
+@app.route('/api/debug/test-sync', methods=['GET'])
+def debug_test_sync():
+    """Test sync query with specific parameters"""
+    spreadsheet_id = request.args.get('sheet', '1NfKW8Z52YNwfArSKVyAVENkUZogdKqXEFqONYVj9w0U')
+    since = request.args.get('since', '2025-12-15T00:00:00')
+    exclude_session = request.args.get('exclude', '')
+
+    changes = db.get_attendance_changes_since(spreadsheet_id, since, exclude_session)
+
+    return jsonify({
+        'query_params': {
+            'spreadsheet_id': spreadsheet_id,
+            'since': since,
+            'exclude_session': exclude_session
+        },
+        'changes_found': len(changes),
+        'changes': changes
+    })
+
 # ============================================
 # Email Authentication API
 # ============================================
