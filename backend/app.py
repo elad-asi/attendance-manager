@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '0.9.11'  # Incremental sync - poll only gets changes from others
+BE_VERSION = '1.0.0'  # Stable release
 
 # NOTE: Active users are now tracked in SQLite database (see database.py)
 # This allows multi-worker deployments (like Gunicorn) to share state

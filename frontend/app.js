@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.9.11';  // Incremental sync - poll only gets changes from others
+const FE_VERSION = '1.0.0';  // Stable release
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -1862,7 +1862,6 @@ function renderTable() {
         const row = document.createElement('tr');
         // Mark rows with missing ma in red
         const maValue = (member.ma || '').toString().trim();
-        console.log(`Row ${index + 1}: ma="${member.ma}", maValue="${maValue}", isEmpty=${!maValue}`);
         if (!maValue) {
             row.classList.add('missing-ma');
         }
