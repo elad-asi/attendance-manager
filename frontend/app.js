@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '1.0.10';  // Fix sync after backup restore
+const FE_VERSION = '1.1.0';  // Force full reload after backup restore
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -11,6 +11,7 @@ let pollIntervalId = null;
 let currentUserEmail = null;
 let isSaving = false; // Flag to prevent poll from overwriting during save
 let lastSyncTimestamp = ''; // Track last sync time for incremental updates
+let currentDataVersion = 0; // Track data version to detect backup restores
 
 // Unique session ID for this browser tab (allows same user on multiple machines)
 const SESSION_ID = generateSessionId();
@@ -547,7 +548,8 @@ async function pollForUpdates() {
         const response = await apiPost(`/sheets/${currentSpreadsheetId}/heartbeat`, {
             email: currentUserEmail || 'Anonymous',
             sessionId: SESSION_ID,
-            lastSync: lastSyncTimestamp  // Send last sync time for incremental updates
+            lastSync: lastSyncTimestamp,  // Send last sync time for incremental updates
+            dataVersion: currentDataVersion  // Send data version to detect backup restores
         });
 
         if (response.error) {
@@ -566,6 +568,11 @@ async function pollForUpdates() {
             lastSyncTimestamp = response.serverTimestamp;
         }
 
+        // Update data version
+        if (response.dataVersion) {
+            currentDataVersion = response.dataVersion;
+        }
+
         if (response.mode === 'incremental') {
             // Apply only changes from other users
             console.log(`Poll incremental: ${response.changes?.length || 0} changes`);
@@ -574,8 +581,12 @@ async function pollForUpdates() {
                 applyAttendanceChanges(response.changes);
             }
         } else if (response.mode === 'full') {
-            // First sync - full data load
-            console.log('Full sync from server');
+            // Full data load (first sync OR backup restore detected)
+            if (response.reason === 'data_version_changed') {
+                console.log('Full reload triggered - backup was restored');
+            } else {
+                console.log('Full sync from server');
+            }
             teamMembers = response.teamMembers || [];
             attendanceData = response.attendanceData || {};
 

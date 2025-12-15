@@ -114,7 +114,7 @@ def restore_backup(backup_filename):
         return False, f"Restore failed: {str(e)}"
 
 def _post_restore_sync_setup():
-    """After restoring a backup, ensure sync column exists and mark all records for sync"""
+    """After restoring a backup, ensure sync column exists and increment data version to force full reload"""
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -127,18 +127,35 @@ def _post_restore_sync_setup():
         cursor.execute('ALTER TABLE attendance ADD COLUMN updated_by_session TEXT DEFAULT ""')
         print("Post-restore: Added updated_by_session column")
 
-    # Mark ALL attendance records with a special "restore" session ID
-    # This ensures all connected clients will receive these records on next poll
-    restore_session = 'restore_' + datetime.now().strftime('%Y%m%d_%H%M%S')
-    cursor.execute('''
-        UPDATE attendance
-        SET updated_by_session = ?, updated_at = ?
-    ''', (restore_session, datetime.now().isoformat()))
+    # Increment the data_version to signal all clients need a full reload
+    increment_data_version()
 
-    affected = cursor.rowcount
     conn.commit()
     conn.close()
-    print(f"Post-restore: Marked {affected} attendance records for sync with session {restore_session}")
+    print("Post-restore: Incremented data version to force full reload on all clients")
+
+# Global data version - incremented on restore to force all clients to full reload
+_data_version_file = os.path.join(SCRIPT_DIR, 'data', 'data_version.txt')
+
+def get_data_version():
+    """Get the current data version number"""
+    try:
+        if os.path.exists(_data_version_file):
+            with open(_data_version_file, 'r') as f:
+                return int(f.read().strip())
+    except:
+        pass
+    return 1
+
+def increment_data_version():
+    """Increment data version to force all clients to full reload"""
+    os.makedirs(os.path.dirname(_data_version_file), exist_ok=True)
+    current = get_data_version()
+    new_version = current + 1
+    with open(_data_version_file, 'w') as f:
+        f.write(str(new_version))
+    print(f"Data version incremented: {current} -> {new_version}")
+    return new_version
 
 def init_database():
     """Initialize the database schema - using spreadsheet_id (Google Sheet ID) as primary key"""

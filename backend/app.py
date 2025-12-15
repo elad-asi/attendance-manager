@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '1.0.10'  # Fix sync after backup restore
+BE_VERSION = '1.1.0'  # Force full reload after backup restore
 
 # NOTE: Active users are now tracked in SQLite database (see database.py)
 # This allows multi-worker deployments (like Gunicorn) to share state
@@ -642,6 +642,7 @@ def heartbeat(spreadsheet_id):
     user_email = req.get('email', 'Anonymous')
     session_id = req.get('sessionId', 'unknown')
     last_sync = req.get('lastSync', '')  # ISO timestamp of last sync
+    client_data_version = req.get('dataVersion', 0)  # Client's last known data version
 
     # Update active users in database (shared across all workers)
     db.update_active_user(session_id, user_email, spreadsheet_id, time.time())
@@ -649,8 +650,31 @@ def heartbeat(spreadsheet_id):
     # Get list of other active users on this sheet (exclude current session)
     other_users = db.get_active_users_for_sheet(spreadsheet_id, exclude_session=session_id)
 
-    # Get current server timestamp
+    # Get current server timestamp and data version
     server_timestamp = db.get_server_timestamp()
+    current_data_version = db.get_data_version()
+
+    # Check if data version changed (backup was restored) - force full reload
+    if client_data_version and client_data_version != current_data_version:
+        print(f"[SYNC] Data version mismatch: client={client_data_version}, server={current_data_version} - forcing full reload")
+        sheet = db.get_sheet_by_id(spreadsheet_id)
+        if not sheet:
+            return jsonify({'error': 'Sheet not found'}), 404
+
+        team_members = db.get_team_members(spreadsheet_id)
+        attendance_data = db.get_attendance(spreadsheet_id)
+
+        return jsonify({
+            'success': True,
+            'mode': 'full',
+            'reason': 'data_version_changed',
+            'sheet': sheet,
+            'teamMembers': team_members,
+            'attendanceData': attendance_data,
+            'serverTimestamp': server_timestamp,
+            'dataVersion': current_data_version,
+            'activeUsers': other_users
+        })
 
     # If client has lastSync, only return changes from OTHER users since that time
     if last_sync:
@@ -661,6 +685,7 @@ def heartbeat(spreadsheet_id):
             'mode': 'incremental',
             'changes': changes,
             'serverTimestamp': server_timestamp,
+            'dataVersion': current_data_version,
             'activeUsers': other_users
         })
     else:
@@ -679,6 +704,7 @@ def heartbeat(spreadsheet_id):
             'teamMembers': team_members,
             'attendanceData': attendance_data,
             'serverTimestamp': server_timestamp,
+            'dataVersion': current_data_version,
             'activeUsers': other_users
         })
 
