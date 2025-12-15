@@ -2420,6 +2420,9 @@ async function loadCloudBackupList() {
             // Get source badge text (manual or auto)
             const sourceBadge = backup.source === 'auto' ? 'אוטומטי' : 'ידני';
             const sourceBadgeClass = backup.source === 'auto' ? 'source-auto' : 'source-manual';
+            // Notes and user email
+            const notesHtml = backup.notes ? `<div class="backup-notes">${backup.notes}</div>` : '';
+            const userEmailHtml = backup.user_email ? `<span class="backup-user">${backup.user_email}</span>` : '';
 
             return `
                 <div class="backup-item cloud-backup" data-path="${backup.path}">
@@ -2427,7 +2430,9 @@ async function loadCloudBackupList() {
                         <span class="backup-item-date">${formattedDate}</span>
                         <span class="backup-item-size">${sizeKB} KB</span>
                         <span class="backup-source-badge ${sourceBadgeClass}">${sourceBadge}</span>
+                        ${userEmailHtml}
                     </div>
+                    ${notesHtml}
                     <div class="backup-item-actions">
                         <button class="btn-compare-cloud" onclick="compareWithCloud('${escapedPath}', event)">השווה</button>
                         <button class="btn-restore-cloud" onclick="restoreFromCloud('${escapedPath}')">שחזר</button>
@@ -2445,6 +2450,13 @@ async function loadCloudBackupList() {
 }
 
 async function uploadToCloud() {
+    // Prompt user for backup notes
+    const notes = prompt('הערות לגיבוי (אופציונלי):');
+    if (notes === null) {
+        // User cancelled
+        return;
+    }
+
     const uploadBtn = document.getElementById('uploadToDriveBtn');
     uploadBtn.disabled = true;
     uploadBtn.textContent = 'מעלה...';
@@ -2454,7 +2466,11 @@ async function uploadToCloud() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({
+                notes: notes || '',
+                user_email: currentUserEmail || 'Anonymous'
+            })
         });
         const data = await response.json();
 

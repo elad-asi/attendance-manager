@@ -750,8 +750,11 @@ def list_cloud_backups():
 
 @app.route('/api/cloud-backups/upload', methods=['POST'])
 def upload_to_cloud():
-    """Upload current database to cloud"""
-    result = cloud_backup.upload_backup_to_cloud()
+    """Upload current database to cloud with optional notes and user email"""
+    data = request.get_json() or {}
+    notes = data.get('notes', '')
+    user_email = data.get('user_email', 'Anonymous')
+    result = cloud_backup.upload_backup_to_cloud(source='manual', notes=notes, user_email=user_email)
     if result['success']:
         return jsonify(result)
     return jsonify(result), 400

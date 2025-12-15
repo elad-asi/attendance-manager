@@ -1965,6 +1965,22 @@ thead .col-yamam {
     background: #6c757d;
 }
 
+.backup-user {
+    font-size: 0.75rem;
+    color: #667eea;
+    margin-right: 10px;
+}
+
+.backup-notes {
+    font-size: 0.85rem;
+    color: #495057;
+    padding: 5px 10px;
+    background: rgba(102, 126, 234, 0.1);
+    border-radius: 4px;
+    margin: 5px 0;
+    font-style: italic;
+}
+
 .cloud-backup {
     background: #f0f7ff;
     border: 1px solid #a0c4ff;

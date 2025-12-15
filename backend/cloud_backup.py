@@ -477,13 +477,15 @@ def _get_all_spreadsheet_ids():
     return list(spreadsheet_ids)
 
 
-def upload_backup_to_cloud(source='manual'):
+def upload_backup_to_cloud(source='manual', notes='', user_email=''):
     """Upload current database to JSONBin as base64-encoded JSON.
     Skips upload if data hasn't changed since last backup.
     Saves backup reference to each spreadsheet's index for cross-machine sync.
 
     Args:
         source: 'manual' for user-initiated backups, 'auto' for hourly auto-backups
+        notes: optional notes/description for the backup
+        user_email: email of user who initiated the backup (for manual backups)
     """
     if not os.path.exists(DATABASE_FILE):
         return {'success': False, 'error': 'Database file not found'}
@@ -559,7 +561,9 @@ def upload_backup_to_cloud(source='manual'):
                 'sheets': sheets_info,
                 'spreadsheet_ids': spreadsheet_ids,
                 'hash': current_hash,
-                'source': source  # 'manual' or 'auto'
+                'source': source,  # 'manual' or 'auto'
+                'notes': notes,  # User-provided notes
+                'user_email': user_email if source == 'manual' else ''  # Only for manual backups
             }
 
             # Save to the global hardcoded index (primary index for listing)
@@ -649,7 +653,9 @@ def list_cloud_backups(filter_sheet_id=None, spreadsheet_id=None):
                 'timestamp': backup['timestamp'],
                 'size': backup.get('size', 0),
                 'sheets': backup.get('sheets', []),  # Include sheets info
-                'source': backup.get('source', 'manual')  # Use actual source from backup
+                'source': backup.get('source', 'manual'),  # Use actual source from backup
+                'notes': backup.get('notes', ''),  # User-provided notes
+                'user_email': backup.get('user_email', '')  # User who created the backup
             })
 
         # Sort by timestamp descending
