@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '1.1.0';  // Force full reload after backup restore
+const FE_VERSION = '1.1.1';  // Better restore warning message
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -2444,7 +2444,7 @@ async function restoreBackup() {
         return;
     }
 
-    const confirmed = confirm('האם אתה בטוח שברצונך לשחזר את הגיבוי?\nפעולה זו תחליף את כל הנתונים הנוכחיים.');
+    const confirmed = confirm('שחזור גיבוי\n\n⚠️ אזהרה: פעולה זו תחליף את כל הנתונים בשרת!\n\nכל השינויים שבוצעו מאז הגיבוי יאבדו - גם במחשב זה וגם בכל המחשבים המחוברים האחרים.\n\nהאם להמשיך?');
     if (!confirmed) return;
 
     try {
@@ -2596,7 +2596,7 @@ async function uploadToCloud() {
 }
 
 async function restoreFromCloud(filePath) {
-    const confirmed = confirm('האם אתה בטוח שברצונך לשחזר את הגיבוי מהענן?\nפעולה זו תחליף את כל הנתונים הנוכחיים.');
+    const confirmed = confirm('שחזור גיבוי מהענן\n\n⚠️ אזהרה: פעולה זו תחליף את כל הנתונים בשרת!\n\nכל השינויים שבוצעו מאז הגיבוי יאבדו - גם במחשב זה וגם בכל המחשבים המחוברים האחרים.\n\nהאם להמשיך?');
     if (!confirmed) return;
 
     try {
