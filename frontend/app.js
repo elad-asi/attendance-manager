@@ -3,12 +3,13 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.9.9';  // Unified unit selector with יממ summary
+const FE_VERSION = '0.9.10';  // Fix race condition in poll vs save
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
 let pollIntervalId = null;
 let currentUserEmail = null;
+let isSaving = false; // Flag to prevent poll from overwriting during save
 
 // Unique session ID for this browser tab (allows same user on multiple machines)
 const SESSION_ID = generateSessionId();
@@ -535,6 +536,12 @@ function stopPolling() {
 async function pollForUpdates() {
     if (!currentSpreadsheetId) return;
 
+    // Skip polling if we're currently saving to avoid race condition
+    if (isSaving) {
+        console.log('Skipping poll - save in progress');
+        return;
+    }
+
     try {
         const response = await apiPost(`/sheets/${currentSpreadsheetId}/heartbeat`, {
             email: currentUserEmail || 'Anonymous',
@@ -543,6 +550,12 @@ async function pollForUpdates() {
 
         if (response.error) {
             console.error('Polling error:', response.error);
+            return;
+        }
+
+        // Skip update if save started while we were fetching
+        if (isSaving) {
+            console.log('Skipping poll update - save started during fetch');
             return;
         }
 
@@ -768,6 +781,9 @@ async function saveAttendanceToBackend(ma, date, status) {
         return;
     }
 
+    // Set saving flag to prevent poll from overwriting
+    isSaving = true;
+
     try {
         const result = await apiPost(`/sheets/${currentSpreadsheetId}/attendance`, { ma, date, status });
         if (result.success) {
@@ -778,6 +794,11 @@ async function saveAttendanceToBackend(ma, date, status) {
     } catch (error) {
         console.error('Error saving attendance:', error);
         showSaveToast('שגיאה בשמירה', true);
+    } finally {
+        // Reset flag after a short delay to ensure poll gets updated data
+        setTimeout(() => {
+            isSaving = false;
+        }, 500);
     }
 }
 
@@ -1968,7 +1989,7 @@ async function cycleStatus(cell, ma, date) {
     updateMemberTotals(ma);
 
     // Update יממ summary
-    updateYamamSummary();
+    renderUnitSelector();
 }
 
 function updateTotals(dateStr) {

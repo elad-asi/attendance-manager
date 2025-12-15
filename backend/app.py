@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '0.9.9'  # Unified unit selector, backup notes, fixed compare
+BE_VERSION = '0.9.10'  # Fixed race condition in poll vs save
 
 # NOTE: Active users are now tracked in SQLite database (see database.py)
 # This allows multi-worker deployments (like Gunicorn) to share state
