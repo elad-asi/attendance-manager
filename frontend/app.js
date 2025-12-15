@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '1.0.0';  // Stable release
+const FE_VERSION = '1.0.2';  // Debug poll sync
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
