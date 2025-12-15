@@ -611,7 +611,7 @@ function applyAttendanceChanges(changes) {
         const cell = document.querySelector(`td[data-ma="${ma}"][data-date="${date}"]`);
         if (cell) {
             cell.className = `attendance-cell ${status}`;
-            cell.textContent = getStatusSymbol(status);
+            cell.textContent = STATUS_LABELS[status] || '';
         } else {
             needsRerender = true;
         }
