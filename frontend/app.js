@@ -403,9 +403,6 @@ function initializeApp() {
     document.getElementById('inputGdud').addEventListener('input', updateLoadButtonState);
     document.getElementById('inputPluga').addEventListener('input', updateLoadButtonState);
 
-    // XLS Upload
-    document.getElementById('xlsUpload').addEventListener('change', handleXLSUpload);
-
     // Date range
     document.getElementById('applyDates').addEventListener('click', applyDateRange);
 
@@ -1337,43 +1334,6 @@ function toggleUploadSection() {
     if (uploadSection) {
         uploadSection.classList.toggle('collapsed');
     }
-}
-
-// ============================================
-// XLS Upload Functions
-// ============================================
-
-function handleXLSUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async function(e) {
-        try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-
-            const members = jsonData.map(row => ({
-                firstName: row['שם פרטי'] || row['first name'] || '',
-                lastName: row['שם משפחה'] || row['last name'] || '',
-                ma: String(row['מ.א'] || row['ma'] || row['id'] || ''),
-                gdud: row['גדוד'] || row['gdud'] || '',
-                pluga: row['פלוגה'] || row['pluga'] || '',
-                mahlaka: row['מחלקה'] || row['mahlaka'] || ''
-            }));
-
-            await saveTeamMembersToBackend(members);
-            await loadFromBackend();
-
-            alert(`נטענו ${members.length} חברי צוות בהצלחה!`);
-        } catch (error) {
-            console.error('Error parsing XLS:', error);
-            alert('שגיאה בקריאת הקובץ');
-        }
-    };
-    reader.readAsArrayBuffer(file);
 }
 
 // ============================================
