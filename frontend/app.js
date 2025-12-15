@@ -1860,6 +1860,12 @@ function renderTable() {
     // Add member rows with running index
     sortedMembers.forEach((member, index) => {
         const row = document.createElement('tr');
+        // Mark rows with missing ma in red
+        const maValue = (member.ma || '').toString().trim();
+        console.log(`Row ${index + 1}: ma="${member.ma}", maValue="${maValue}", isEmpty=${!maValue}`);
+        if (!maValue) {
+            row.classList.add('missing-ma');
+        }
 
         // Calculate dorech and yamam for this member across all dates
         const memberDorech = calculateMemberTotal(member.ma, dates, TOTALS_CONFIG.mission);

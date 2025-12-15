@@ -999,6 +999,15 @@ thead .col-yamam {
     background: #c9b8dc;
 }
 
+/* Missing MA - mark row text in red */
+#attendanceTable tbody tr.missing-ma td {
+    color: #dc3545 !important;
+}
+
+#attendanceTable tbody tr.missing-ma td.sticky-col {
+    color: #dc3545 !important;
+}
+
 /* Dorech/yamam columns center text */
 #attendanceTable tbody td.col-dorech,
 #attendanceTable tbody td.col-yamam {
