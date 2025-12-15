@@ -475,6 +475,47 @@ def run_migration():
     """Run database migrations (v0.10 - already using spreadsheet_id as primary key)"""
     return jsonify({'success': True, 'message': 'Database already up to date (spreadsheet_id is primary key)'})
 
+@app.route('/api/debug/sync-status', methods=['GET'])
+def debug_sync_status():
+    """Debug endpoint to check sync status"""
+    import sqlite3
+    conn = db.get_db_connection()
+    cursor = conn.cursor()
+
+    # Check if updated_by_session column exists
+    cursor.execute("PRAGMA table_info(attendance)")
+    columns = [col['name'] for col in cursor.fetchall()]
+    has_session_col = 'updated_by_session' in columns
+
+    # Get recent attendance records with session info
+    recent = []
+    try:
+        cursor.execute('''
+            SELECT ma, date, status, updated_at, updated_by_session
+            FROM attendance
+            ORDER BY updated_at DESC
+            LIMIT 10
+        ''')
+        for row in cursor.fetchall():
+            recent.append({
+                'ma': row['ma'],
+                'date': row['date'],
+                'status': row['status'],
+                'updated_at': row['updated_at'],
+                'session': row['updated_by_session'] if 'updated_by_session' in row.keys() else 'N/A'
+            })
+    except Exception as e:
+        recent = [{'error': str(e)}]
+
+    conn.close()
+
+    return jsonify({
+        'columns': columns,
+        'has_session_column': has_session_col,
+        'recent_attendance': recent,
+        'server_time': db.get_server_timestamp()
+    })
+
 # ============================================
 # Email Authentication API
 # ============================================
