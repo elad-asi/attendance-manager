@@ -1318,12 +1318,11 @@ async function confirmColumnMapping() {
             throw new Error(parseResponse.error);
         }
 
-        // Add gdud and pluga to all members, generate temp ma for those without
-        const mappedMembers = parseResponse.members.map((m, index) => ({
+        // Add gdud and pluga to all members
+        const mappedMembers = parseResponse.members.map(m => ({
             firstName: m.firstName || '',
             lastName: m.lastName || '',
-            // Generate temporary ma if missing (TEMP_ prefix + hash of name + index)
-            ma: m.ma || `TEMP_${(m.firstName || '').substring(0,3)}${(m.lastName || '').substring(0,3)}_${index}`,
+            ma: m.ma || '',
             mahlaka: currentColumnMapping.mahlaka === 'skip' ? '' : (m.mahlaka || ''),
             miktzoaTzvai: currentColumnMapping.miktzoaTzvai === 'skip' ? '' : (m.miktzoaTzvai || ''),
             gdud: gdud,
@@ -2015,6 +2014,12 @@ function getAllowedStatuses(ma, date) {
 }
 
 async function cycleStatus(cell, ma, date) {
+    // Don't allow updates for members without ma
+    if (!ma || ma.startsWith('TEMP_')) {
+        alert('לא ניתן לעדכן נוכחות - חסר מספר אישי (מ.א)');
+        return;
+    }
+
     const currentStatus = cell.className.replace('attendance-cell ', '').trim();
     const allowedStatuses = getAllowedStatuses(ma, date);
 
