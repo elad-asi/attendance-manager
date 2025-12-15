@@ -1318,11 +1318,12 @@ async function confirmColumnMapping() {
             throw new Error(parseResponse.error);
         }
 
-        // Add gdud and pluga to all members
-        const mappedMembers = parseResponse.members.map(m => ({
+        // Add gdud and pluga to all members, generate temp ma for those without
+        const mappedMembers = parseResponse.members.map((m, index) => ({
             firstName: m.firstName || '',
             lastName: m.lastName || '',
-            ma: m.ma || '',
+            // Generate temporary ma if missing (TEMP_ prefix + hash of name + index)
+            ma: m.ma || `TEMP_${(m.firstName || '').substring(0,3)}${(m.lastName || '').substring(0,3)}_${index}`,
             mahlaka: currentColumnMapping.mahlaka === 'skip' ? '' : (m.mahlaka || ''),
             miktzoaTzvai: currentColumnMapping.miktzoaTzvai === 'skip' ? '' : (m.miktzoaTzvai || ''),
             gdud: gdud,
@@ -2014,13 +2015,6 @@ function getAllowedStatuses(ma, date) {
 }
 
 async function cycleStatus(cell, ma, date) {
-    // Don't allow clicking on members without ma (can't save to backend)
-    if (!ma) {
-        console.warn('Cannot update attendance for member without ma');
-        showSaveToast('לא ניתן לעדכן - חסר מ.א', true);
-        return;
-    }
-
     const currentStatus = cell.className.replace('attendance-cell ', '').trim();
     const allowedStatuses = getAllowedStatuses(ma, date);
 
