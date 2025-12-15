@@ -354,19 +354,22 @@ def update_attendance(spreadsheet_id, ma, date, status, session_id=''):
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    timestamp = datetime.now().isoformat()
+
     try:
         # Try with updated_by_session column
         cursor.execute('''
             INSERT OR REPLACE INTO attendance (spreadsheet_id, ma, date, status, updated_at, updated_by_session)
             VALUES (?, ?, ?, ?, ?, ?)
-        ''', (spreadsheet_id, ma, date, status, datetime.now().isoformat(), session_id))
+        ''', (spreadsheet_id, ma, date, status, timestamp, session_id))
+        print(f"[SYNC DEBUG] Saved attendance: ma={ma}, date={date}, status={status}, session={session_id[:8] if session_id else 'none'}..., time={timestamp}")
     except Exception as e:
         # Fallback without updated_by_session if column doesn't exist
         print(f"Warning: Falling back to update without session_id: {e}")
         cursor.execute('''
             INSERT OR REPLACE INTO attendance (spreadsheet_id, ma, date, status, updated_at)
             VALUES (?, ?, ?, ?, ?)
-        ''', (spreadsheet_id, ma, date, status, datetime.now().isoformat()))
+        ''', (spreadsheet_id, ma, date, status, timestamp))
 
     conn.commit()
     conn.close()
@@ -404,7 +407,7 @@ def get_attendance_changes_since(spreadsheet_id, since_timestamp, exclude_sessio
             # Only return changes made by OTHER sessions (not empty/null session IDs - those are old data)
             # This prevents returning all old records that don't have session tracking yet
             cursor.execute('''
-                SELECT ma, date, status, updated_at FROM attendance
+                SELECT ma, date, status, updated_at, updated_by_session FROM attendance
                 WHERE spreadsheet_id = ? AND updated_at > ?
                 AND updated_by_session IS NOT NULL
                 AND updated_by_session != ''
@@ -417,6 +420,10 @@ def get_attendance_changes_since(spreadsheet_id, since_timestamp, exclude_sessio
             ''', (spreadsheet_id, since_timestamp))
 
         rows = cursor.fetchall()
+
+        # Debug: log what we found
+        print(f"[SYNC DEBUG] Query: since={since_timestamp}, exclude_session={exclude_session_id[:8] if exclude_session_id else 'none'}..., found={len(rows)} rows")
+
         conn.close()
 
         # Return as list of changes with metadata
