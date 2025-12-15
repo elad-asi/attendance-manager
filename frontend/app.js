@@ -1451,7 +1451,11 @@ function getUnitFilteredMembers(members) {
     if (activeUnitTabs.length === 0) {
         return members;
     }
-    return members.filter(m => activeUnitTabs.includes(m.mahlaka));
+    return members.filter(m => {
+        // Handle "ללא מחלקה" - matches empty/undefined mahlaka
+        const memberUnit = m.mahlaka || 'ללא מחלקה';
+        return activeUnitTabs.includes(memberUnit);
+    });
 }
 
 // ============================================
