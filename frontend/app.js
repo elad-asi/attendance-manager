@@ -568,8 +568,9 @@ async function pollForUpdates() {
 
         if (response.mode === 'incremental') {
             // Apply only changes from other users
+            console.log(`Poll incremental: ${response.changes?.length || 0} changes`);
             if (response.changes && response.changes.length > 0) {
-                console.log(`Applying ${response.changes.length} changes from other users`);
+                console.log(`Applying ${response.changes.length} changes from other users`, response.changes);
                 applyAttendanceChanges(response.changes);
             }
         } else if (response.mode === 'full') {
