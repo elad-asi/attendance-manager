@@ -734,8 +734,10 @@ def restore_from_cloud(bin_id):
         return {'success': False, 'error': str(e)}
 
 
-def compare_with_cloud(bin_id, sheet_id=None):
-    """Compare current database with a cloud backup and return differences"""
+def compare_with_cloud(bin_id, spreadsheet_id=None):
+    """Compare current database with a cloud backup and return differences.
+    Uses spreadsheet_id as the primary key (Google Sheet ID).
+    """
     import tempfile
     import sqlite3
 
@@ -763,16 +765,16 @@ def compare_with_cloud(bin_id, sheet_id=None):
             'summary': {}
         }
 
-        # Get sheets to compare
-        if sheet_id:
-            sheet_ids = [sheet_id]
+        # Get spreadsheet_ids to compare
+        if spreadsheet_id:
+            spreadsheet_ids = [spreadsheet_id]
         else:
-            # Get all sheet IDs from current DB
+            # Get all spreadsheet IDs from current DB
             cursor = current_conn.cursor()
-            cursor.execute('SELECT id FROM sheets')
-            sheet_ids = [row['id'] for row in cursor.fetchall()]
+            cursor.execute('SELECT spreadsheet_id FROM sheets')
+            spreadsheet_ids = [row['spreadsheet_id'] for row in cursor.fetchall()]
 
-        for sid in sheet_ids:
+        for ssid in spreadsheet_ids:
             # Compare attendance data
             current_cursor = current_conn.cursor()
             backup_cursor = backup_conn.cursor()
@@ -781,9 +783,9 @@ def compare_with_cloud(bin_id, sheet_id=None):
             current_cursor.execute('''
                 SELECT a.ma, a.date, a.status, t.first_name, t.last_name
                 FROM attendance a
-                LEFT JOIN team_members t ON a.sheet_id = t.sheet_id AND a.ma = t.ma
-                WHERE a.sheet_id = ?
-            ''', (sid,))
+                LEFT JOIN team_members t ON a.spreadsheet_id = t.spreadsheet_id AND a.ma = t.ma
+                WHERE a.spreadsheet_id = ?
+            ''', (ssid,))
             current_attendance = {(row['ma'], row['date']): {
                 'status': row['status'],
                 'name': f"{row['first_name'] or ''} {row['last_name'] or ''}".strip()
@@ -794,9 +796,9 @@ def compare_with_cloud(bin_id, sheet_id=None):
                 backup_cursor.execute('''
                     SELECT a.ma, a.date, a.status, t.first_name, t.last_name
                     FROM attendance a
-                    LEFT JOIN team_members t ON a.sheet_id = t.sheet_id AND a.ma = t.ma
-                    WHERE a.sheet_id = ?
-                ''', (sid,))
+                    LEFT JOIN team_members t ON a.spreadsheet_id = t.spreadsheet_id AND a.ma = t.ma
+                    WHERE a.spreadsheet_id = ?
+                ''', (ssid,))
                 backup_attendance = {(row['ma'], row['date']): {
                     'status': row['status'],
                     'name': f"{row['first_name'] or ''} {row['last_name'] or ''}".strip()
@@ -841,11 +843,11 @@ def compare_with_cloud(bin_id, sheet_id=None):
                     })
 
             # Compare team members
-            current_cursor.execute('SELECT ma, first_name, last_name FROM team_members WHERE sheet_id = ?', (sid,))
+            current_cursor.execute('SELECT ma, first_name, last_name FROM team_members WHERE spreadsheet_id = ?', (ssid,))
             current_members = {row['ma']: f"{row['first_name']} {row['last_name']}" for row in current_cursor.fetchall()}
 
             try:
-                backup_cursor.execute('SELECT ma, first_name, last_name FROM team_members WHERE sheet_id = ?', (sid,))
+                backup_cursor.execute('SELECT ma, first_name, last_name FROM team_members WHERE spreadsheet_id = ?', (ssid,))
                 backup_members = {row['ma']: f"{row['first_name']} {row['last_name']}" for row in backup_cursor.fetchall()}
             except:
                 backup_members = {}

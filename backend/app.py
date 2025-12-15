@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '0.9.7'  # Using spreadsheet_id as primary key
+BE_VERSION = '0.9.9'  # Unified unit selector, backup notes, fixed compare
 
 # NOTE: Active users are now tracked in SQLite database (see database.py)
 # This allows multi-worker deployments (like Gunicorn) to share state
@@ -797,10 +797,10 @@ def compare_with_cloud_backup():
     """Compare current database with a cloud backup"""
     data = request.get_json()
     file_path = data.get('path')
-    sheet_id = data.get('sheet_id')
+    spreadsheet_id = data.get('spreadsheet_id')
     if not file_path:
         return jsonify({'success': False, 'error': 'File path required'}), 400
-    result = cloud_backup.compare_with_cloud(file_path, sheet_id)
+    result = cloud_backup.compare_with_cloud(file_path, spreadsheet_id)
     if result['success']:
         return jsonify(result)
     return jsonify(result), 400

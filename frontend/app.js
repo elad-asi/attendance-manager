@@ -2557,7 +2557,7 @@ async function compareWithCloud(filePath, evt) {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ path: filePath })
+            body: JSON.stringify({ path: filePath, spreadsheet_id: currentSpreadsheetId })
         });
         const data = await response.json();
 
