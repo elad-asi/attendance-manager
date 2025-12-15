@@ -2014,6 +2014,13 @@ function getAllowedStatuses(ma, date) {
 }
 
 async function cycleStatus(cell, ma, date) {
+    // Don't allow clicking on members without ma (can't save to backend)
+    if (!ma) {
+        console.warn('Cannot update attendance for member without ma');
+        showSaveToast('לא ניתן לעדכן - חסר מ.א', true);
+        return;
+    }
+
     const currentStatus = cell.className.replace('attendance-cell ', '').trim();
     const allowedStatuses = getAllowedStatuses(ma, date);
 

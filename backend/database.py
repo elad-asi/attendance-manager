@@ -401,38 +401,41 @@ def get_attendance_changes_since(spreadsheet_id, since_timestamp, exclude_sessio
 
     try:
         if exclude_session_id:
-            # Try query with updated_by_session column
+            # Only return changes made by OTHER sessions (not empty/null session IDs - those are old data)
+            # This prevents returning all old records that don't have session tracking yet
             cursor.execute('''
                 SELECT ma, date, status, updated_at FROM attendance
-                WHERE spreadsheet_id = ? AND updated_at > ? AND (updated_by_session != ? OR updated_by_session IS NULL OR updated_by_session = '')
+                WHERE spreadsheet_id = ? AND updated_at > ?
+                AND updated_by_session IS NOT NULL
+                AND updated_by_session != ''
+                AND updated_by_session != ?
             ''', (spreadsheet_id, since_timestamp, exclude_session_id))
         else:
             cursor.execute('''
                 SELECT ma, date, status, updated_at FROM attendance
                 WHERE spreadsheet_id = ? AND updated_at > ?
             ''', (spreadsheet_id, since_timestamp))
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        # Return as list of changes with metadata
+        changes = []
+        for row in rows:
+            changes.append({
+                'ma': row['ma'],
+                'date': row['date'],
+                'status': row['status'],
+                'updated_at': row['updated_at']
+            })
+
+        return changes
+
     except Exception as e:
-        # Fallback if updated_by_session column doesn't exist yet
-        print(f"Warning: updated_by_session column may not exist: {e}")
-        cursor.execute('''
-            SELECT ma, date, status, updated_at FROM attendance
-            WHERE spreadsheet_id = ? AND updated_at > ?
-        ''', (spreadsheet_id, since_timestamp))
-
-    rows = cursor.fetchall()
-    conn.close()
-
-    # Return as list of changes with metadata
-    changes = []
-    for row in rows:
-        changes.append({
-            'ma': row['ma'],
-            'date': row['date'],
-            'status': row['status'],
-            'updated_at': row['updated_at']
-        })
-
-    return changes
+        # Fallback if updated_by_session column doesn't exist yet - return empty (no incremental updates)
+        print(f"Warning: updated_by_session column may not exist, returning empty changes: {e}")
+        conn.close()
+        return []  # No incremental updates possible without the column
 
 def get_server_timestamp():
     """Get current server timestamp in ISO format"""
