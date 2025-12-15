@@ -441,19 +441,19 @@ def _cleanup_old_backups(index):
 
 
 def _get_sheets_info():
-    """Get list of sheets from the database including spreadsheet_id"""
+    """Get list of sheets from the database - spreadsheet_id is the primary key"""
     import sqlite3
     sheets = []
     try:
         conn = sqlite3.connect(DATABASE_FILE)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute('SELECT id, spreadsheet_id, sheet_name FROM sheets')
+        cursor.execute('SELECT spreadsheet_id, sheet_name, spreadsheet_title FROM sheets')
         for row in cursor.fetchall():
             sheets.append({
-                'id': row['id'],
                 'spreadsheet_id': row['spreadsheet_id'],
-                'name': row['sheet_name']
+                'name': row['sheet_name'],
+                'title': row['spreadsheet_title']
             })
         conn.close()
     except Exception as e:
@@ -562,13 +562,20 @@ def upload_backup_to_cloud(source='manual'):
                 'source': source  # 'manual' or 'auto'
             }
 
-            # Save to each spreadsheet's index (for cross-machine sync)
-            for spreadsheet_id in spreadsheet_ids:
-                ss_index = _load_backup_index_for_spreadsheet(spreadsheet_id)
-                ss_index['backups'].append(backup_entry)
-                # Cleanup: Keep only the latest backup per day, max 5 days
-                ss_index = _cleanup_old_backups(ss_index)
-                _save_backup_index_for_spreadsheet(spreadsheet_id, ss_index)
+            # Save to the global hardcoded index (primary index for listing)
+            global_index_bin_id = os.environ.get('JSONBIN_INDEX_BIN_ID') or HARDCODED_INDEX_BIN_ID
+            global_index = _load_cloud_index_direct(global_index_bin_id)
+            global_index['backups'].append(backup_entry)
+            global_index = _cleanup_old_backups(global_index)
+
+            # Update global index in cloud
+            headers_update = _get_headers()
+            requests.put(
+                f'{JSONBIN_API_URL}/b/{global_index_bin_id}',
+                headers=headers_update,
+                json=global_index
+            )
+            print(f"Backup saved to global index: {bin_id}")
 
             return {
                 'success': True,
