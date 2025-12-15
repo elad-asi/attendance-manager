@@ -470,10 +470,35 @@ def get_version():
     """Get backend version"""
     return jsonify({'version': BE_VERSION})
 
-@app.route('/api/migrate', methods=['POST'])
+@app.route('/api/migrate', methods=['POST', 'GET'])
 def run_migration():
-    """Run database migrations (v0.10 - already using spreadsheet_id as primary key)"""
-    return jsonify({'success': True, 'message': 'Database already up to date (spreadsheet_id is primary key)'})
+    """Run database migrations - add updated_by_session column"""
+    conn = db.get_db_connection()
+    cursor = conn.cursor()
+
+    # Check current columns
+    cursor.execute("PRAGMA table_info(attendance)")
+    columns = [col['name'] for col in cursor.fetchall()]
+
+    result = {'columns_before': columns}
+
+    if 'updated_by_session' not in columns:
+        try:
+            cursor.execute('ALTER TABLE attendance ADD COLUMN updated_by_session TEXT DEFAULT ""')
+            conn.commit()
+            result['migration'] = 'Added updated_by_session column'
+        except Exception as e:
+            result['migration_error'] = str(e)
+    else:
+        result['migration'] = 'Column already exists'
+
+    # Check columns after
+    cursor.execute("PRAGMA table_info(attendance)")
+    columns_after = [col['name'] for col in cursor.fetchall()]
+    result['columns_after'] = columns_after
+
+    conn.close()
+    return jsonify(result)
 
 @app.route('/api/debug/sync-status', methods=['GET'])
 def debug_sync_status():
