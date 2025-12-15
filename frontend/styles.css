@@ -689,57 +689,87 @@ header h1 {
     background: #c82333;
 }
 
-/* Unit Tabs */
-.unit-tabs-container {
-    padding: 0 30px;
-    margin-bottom: 15px;
-}
-
-.unit-tabs {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    padding: 10px 0;
-    border-bottom: 2px solid #e9ecef;
-}
-
-.unit-tab {
-    background: #f8f9fa;
-    border: 2px solid #e9ecef;
-    border-bottom: none;
-    border-radius: 8px 8px 0 0;
-    padding: 10px 20px;
-    cursor: pointer;
-    font-size: 0.95rem;
-    font-weight: 500;
-    color: #495057;
-    transition: all 0.2s;
-    position: relative;
-    bottom: -2px;
-}
-
-.unit-tab:hover {
-    background: #e9ecef;
-    color: #2c3e50;
-}
-
-.unit-tab.active {
-    background: #667eea;
-    border-color: #667eea;
+/* Unit Selector Section (combined filter + summary) */
+.unit-selector-section {
+    margin: 0 30px 15px 30px;
+    padding: 15px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
     color: white;
-    font-weight: 600;
 }
 
-.unit-tab .tab-count {
-    background: rgba(255, 255, 255, 0.3);
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 0.8rem;
-    margin-right: 8px;
+.unit-selector-content {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 12px;
 }
 
-.unit-tab.active .tab-count {
-    background: rgba(255, 255, 255, 0.3);
+.unit-card {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 10px 16px;
+    min-width: 100px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 2px solid transparent;
+}
+
+.unit-card:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px);
+}
+
+.unit-card.active {
+    background: rgba(255, 255, 255, 0.35);
+    border-color: rgba(255, 255, 255, 0.6);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.unit-card.all-card {
+    background: rgba(255, 255, 255, 0.25);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+}
+
+.unit-card.all-card.active {
+    background: rgba(255, 255, 255, 0.4);
+    border-color: rgba(255, 255, 255, 0.7);
+}
+
+.unit-card-name {
+    font-size: 0.85rem;
+    opacity: 0.95;
+    margin-bottom: 4px;
+}
+
+.unit-card-count {
+    font-size: 1.3rem;
+    font-weight: bold;
+}
+
+.unit-card-yamam {
+    font-size: 0.75rem;
+    opacity: 0.8;
+    margin-top: 3px;
+}
+
+.unit-selector-total {
+    text-align: center;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    font-size: 1.1rem;
+}
+
+.unit-selector-total .total-label {
+    opacity: 0.9;
+    margin-left: 10px;
+}
+
+.unit-selector-total .total-value {
+    font-size: 1.4rem;
+    font-weight: bold;
 }
 
 /* Attendance Table */
@@ -1175,53 +1205,6 @@ thead .col-yamam {
     padding: 40px;
     color: #6c757d;
     font-size: 1.1rem;
-}
-
-/* Yamam Summary Section */
-.yamam-summary-section {
-    margin-top: 20px;
-    padding: 20px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 12px;
-    color: white;
-}
-
-.yamam-summary-section h3 {
-    margin: 0 0 15px 0;
-    font-size: 1.2rem;
-    text-align: center;
-}
-
-.yamam-summary-content {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
-    justify-content: center;
-}
-
-.yamam-summary-item {
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 8px;
-    padding: 12px 20px;
-    min-width: 120px;
-    text-align: center;
-}
-
-.yamam-summary-item.total-item {
-    background: rgba(255, 255, 255, 0.25);
-    border: 2px solid rgba(255, 255, 255, 0.5);
-    font-weight: bold;
-}
-
-.yamam-summary-label {
-    font-size: 0.85rem;
-    opacity: 0.9;
-    margin-bottom: 5px;
-}
-
-.yamam-summary-value {
-    font-size: 1.5rem;
-    font-weight: bold;
 }
 
 /* Legend */

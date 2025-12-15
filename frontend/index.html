@@ -139,11 +139,14 @@
                     </section>
 
         <section class="attendance-section">
-            <!-- Unit Tabs -->
-            <div class="unit-tabs-container">
-                <div class="unit-tabs" id="unitTabs">
-                    <button class="unit-tab active" data-unit="all">הכל</button>
-                    <!-- Unit tabs will be added dynamically -->
+            <!-- Unit Selector with Summary Style -->
+            <div class="unit-selector-section" id="unitSelectorSection" style="display: none;">
+                <div class="unit-selector-content" id="unitSelectorContent">
+                    <!-- Unit cards will be added dynamically -->
+                </div>
+                <div class="unit-selector-total">
+                    <span class="total-label">סה"כ ימ"מ:</span>
+                    <span class="total-value" id="totalYamamValue">0</span>
                 </div>
             </div>
             <div class="table-container">
@@ -169,14 +172,6 @@
                 </table>
             </div>
             <p id="noDataMsg" class="no-data">עדיין לא נוספו חברי צוות. טען מ-Google Sheets.</p>
-
-            <!-- יממ Summary Section -->
-            <div id="yamamSummarySection" class="yamam-summary-section" style="display: none;">
-                <h3>סיכום ימ"מ</h3>
-                <div id="yamamSummaryContent" class="yamam-summary-content">
-                    <!-- Will be populated dynamically -->
-                </div>
-            </div>
         </section>
 
         <section class="legend-section">

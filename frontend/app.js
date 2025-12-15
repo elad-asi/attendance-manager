@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.9.7';  // Using spreadsheet_id (Google Sheet ID) as primary key
+const FE_VERSION = '0.9.9';  // Unified unit selector with יממ summary
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -1337,42 +1337,80 @@ function toggleUploadSection() {
 }
 
 // ============================================
-// Unit Tabs Functions
+// Unit Selector Functions (combined filter + summary)
 // ============================================
 
-function renderUnitTabs() {
-    const unitTabs = document.getElementById('unitTabs');
-    if (!unitTabs) return;
+function renderUnitSelector() {
+    const selectorSection = document.getElementById('unitSelectorSection');
+    const selectorContent = document.getElementById('unitSelectorContent');
+    const totalYamamValue = document.getElementById('totalYamamValue');
 
-    // Get unique mahlaka values
-    const mahlakas = getUniqueValues('mahlaka', false);
+    if (!selectorSection || !selectorContent) return;
 
-    // Calculate counts for each unit
-    const allCount = teamMembers.length;
+    // Only show if we have team members
+    if (teamMembers.length === 0) {
+        selectorSection.style.display = 'none';
+        return;
+    }
 
-    // Build tabs HTML - "הכל" is active when no specific units are selected
-    const allActive = activeUnitTabs.length === 0 ? 'active' : '';
-    let tabsHtml = `<button class="unit-tab ${allActive}" data-unit="all">
-        הכל <span class="tab-count">${allCount}</span>
-    </button>`;
+    const dates = generateDateRange();
+    const filteredMembers = getFilteredMembers(); // filtered by gdud/pluga only
 
-    mahlakas.forEach(mahlaka => {
-        const count = teamMembers.filter(m => m.mahlaka === mahlaka).length;
-        const isActive = activeUnitTabs.includes(mahlaka) ? 'active' : '';
-        tabsHtml += `<button class="unit-tab ${isActive}" data-unit="${mahlaka}">
-            ${mahlaka} <span class="tab-count">${count}</span>
-        </button>`;
+    // Calculate counts and yamam per unit
+    const unitData = {};
+    let grandTotalYamam = 0;
+
+    filteredMembers.forEach(member => {
+        const unit = member.mahlaka || 'ללא מחלקה';
+        const memberYamam = calculateMemberTotal(member.ma, dates, TOTALS_CONFIG.counted);
+
+        if (!unitData[unit]) {
+            unitData[unit] = { count: 0, yamam: 0 };
+        }
+        unitData[unit].count++;
+        unitData[unit].yamam += memberYamam;
+        grandTotalYamam += memberYamam;
     });
 
-    unitTabs.innerHTML = tabsHtml;
+    // Sort units alphabetically but put 'ללא מחלקה' last
+    const sortedUnits = Object.keys(unitData).sort((a, b) => {
+        if (a === 'ללא מחלקה') return 1;
+        if (b === 'ללא מחלקה') return -1;
+        return a.localeCompare(b, 'he');
+    });
+
+    // Build HTML - "הכל" card first
+    const allActive = activeUnitTabs.length === 0 ? 'active' : '';
+    let html = `
+        <div class="unit-card all-card ${allActive}" data-unit="all">
+            <div class="unit-card-name">הכל</div>
+            <div class="unit-card-count">${filteredMembers.length}</div>
+        </div>
+    `;
+
+    sortedUnits.forEach(unit => {
+        const data = unitData[unit];
+        const isActive = activeUnitTabs.includes(unit) ? 'active' : '';
+        html += `
+            <div class="unit-card ${isActive}" data-unit="${unit}">
+                <div class="unit-card-name">${unit}</div>
+                <div class="unit-card-count">${data.count}</div>
+                <div class="unit-card-yamam">ימ"מ: ${data.yamam}</div>
+            </div>
+        `;
+    });
+
+    selectorContent.innerHTML = html;
+    totalYamamValue.textContent = grandTotalYamam;
+    selectorSection.style.display = 'block';
 
     // Add click handlers
-    unitTabs.querySelectorAll('.unit-tab').forEach(tab => {
-        tab.addEventListener('click', () => handleUnitTabClick(tab.dataset.unit));
+    selectorContent.querySelectorAll('.unit-card').forEach(card => {
+        card.addEventListener('click', () => handleUnitCardClick(card.dataset.unit));
     });
 }
 
-function handleUnitTabClick(unit) {
+function handleUnitCardClick(unit) {
     if (unit === 'all') {
         // Clear all selections - show all units
         activeUnitTabs = [];
@@ -1386,17 +1424,26 @@ function handleUnitTabClick(unit) {
         }
     }
 
-    // Update active state on tabs
-    document.querySelectorAll('.unit-tab').forEach(tab => {
-        if (tab.dataset.unit === 'all') {
-            tab.classList.toggle('active', activeUnitTabs.length === 0);
+    // Update active state on cards
+    document.querySelectorAll('.unit-card').forEach(card => {
+        if (card.dataset.unit === 'all') {
+            card.classList.toggle('active', activeUnitTabs.length === 0);
         } else {
-            tab.classList.toggle('active', activeUnitTabs.includes(tab.dataset.unit));
+            card.classList.toggle('active', activeUnitTabs.includes(card.dataset.unit));
         }
     });
 
     // Re-render the table with the new filter
     renderTable();
+}
+
+// Legacy function names for compatibility
+function renderUnitTabs() {
+    renderUnitSelector();
+}
+
+function handleUnitTabClick(unit) {
+    handleUnitCardClick(unit);
 }
 
 function getUnitFilteredMembers(members) {
@@ -1768,8 +1815,8 @@ function renderTable() {
     // Add total rows (with unit-filtered members)
     renderTotalRows(tbody, dates, unitFilteredMembers);
 
-    // Update יממ summary section
-    updateYamamSummary();
+    // Update unit selector (includes יממ summary)
+    renderUnitSelector();
 }
 
 function renderTotalRows(tbody, dates, filteredMembers) {
@@ -1830,70 +1877,6 @@ function calculateMemberTotal(ma, dates, statusList) {
         }
     });
     return count;
-}
-
-// Calculate and display יממ summary per unit (mahlaka) and grand total
-function updateYamamSummary() {
-    const summarySection = document.getElementById('yamamSummarySection');
-    const summaryContent = document.getElementById('yamamSummaryContent');
-
-    if (!summarySection || !summaryContent) return;
-
-    // Only show if we have team members
-    if (teamMembers.length === 0) {
-        summarySection.style.display = 'none';
-        return;
-    }
-
-    const dates = generateDateRange();
-    // Use ALL filtered members (by gdud/pluga), NOT filtered by unit tab
-    // This shows summary across ALL units
-    const filteredMembers = getFilteredMembers();
-
-    // Group members by mahlaka (unit)
-    const unitYamam = {};
-    let grandTotal = 0;
-
-    filteredMembers.forEach(member => {
-        const unit = member.mahlaka || 'ללא מחלקה';
-        const memberYamam = calculateMemberTotal(member.ma, dates, TOTALS_CONFIG.counted);
-
-        if (!unitYamam[unit]) {
-            unitYamam[unit] = 0;
-        }
-        unitYamam[unit] += memberYamam;
-        grandTotal += memberYamam;
-    });
-
-    // Build HTML for summary
-    let html = '';
-
-    // Sort units alphabetically but put 'ללא מחלקה' last
-    const units = Object.keys(unitYamam).sort((a, b) => {
-        if (a === 'ללא מחלקה') return 1;
-        if (b === 'ללא מחלקה') return -1;
-        return a.localeCompare(b, 'he');
-    });
-
-    units.forEach(unit => {
-        html += `
-            <div class="yamam-summary-item">
-                <div class="yamam-summary-label">${unit}</div>
-                <div class="yamam-summary-value">${unitYamam[unit]}</div>
-            </div>
-        `;
-    });
-
-    // Add grand total
-    html += `
-        <div class="yamam-summary-item total-item">
-            <div class="yamam-summary-label">סה"כ</div>
-            <div class="yamam-summary-value">${grandTotal}</div>
-        </div>
-    `;
-
-    summaryContent.innerHTML = html;
-    summarySection.style.display = 'block';
 }
 
 // Get allowed statuses based on previous day's status
