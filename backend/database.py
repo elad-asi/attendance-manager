@@ -166,8 +166,13 @@ def init_database():
     # Add updated_by_session column if it doesn't exist (migration)
     try:
         cursor.execute('ALTER TABLE attendance ADD COLUMN updated_by_session TEXT DEFAULT ""')
-    except:
-        pass  # Column already exists
+        conn.commit()
+        print("Migration: Added updated_by_session column to attendance table")
+    except Exception as e:
+        if 'duplicate column' in str(e).lower() or 'already exists' in str(e).lower():
+            pass  # Column already exists
+        else:
+            print(f"Migration warning (may be harmless): {e}")
 
     # Active users table - linked directly to spreadsheet_id
     cursor.execute('''
@@ -349,10 +354,19 @@ def update_attendance(spreadsheet_id, ma, date, status, session_id=''):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute('''
-        INSERT OR REPLACE INTO attendance (spreadsheet_id, ma, date, status, updated_at, updated_by_session)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (spreadsheet_id, ma, date, status, datetime.now().isoformat(), session_id))
+    try:
+        # Try with updated_by_session column
+        cursor.execute('''
+            INSERT OR REPLACE INTO attendance (spreadsheet_id, ma, date, status, updated_at, updated_by_session)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (spreadsheet_id, ma, date, status, datetime.now().isoformat(), session_id))
+    except Exception as e:
+        # Fallback without updated_by_session if column doesn't exist
+        print(f"Warning: Falling back to update without session_id: {e}")
+        cursor.execute('''
+            INSERT OR REPLACE INTO attendance (spreadsheet_id, ma, date, status, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (spreadsheet_id, ma, date, status, datetime.now().isoformat()))
 
     conn.commit()
     conn.close()
@@ -385,12 +399,21 @@ def get_attendance_changes_since(spreadsheet_id, since_timestamp, exclude_sessio
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    if exclude_session_id:
-        cursor.execute('''
-            SELECT ma, date, status, updated_at FROM attendance
-            WHERE spreadsheet_id = ? AND updated_at > ? AND (updated_by_session != ? OR updated_by_session IS NULL OR updated_by_session = '')
-        ''', (spreadsheet_id, since_timestamp, exclude_session_id))
-    else:
+    try:
+        if exclude_session_id:
+            # Try query with updated_by_session column
+            cursor.execute('''
+                SELECT ma, date, status, updated_at FROM attendance
+                WHERE spreadsheet_id = ? AND updated_at > ? AND (updated_by_session != ? OR updated_by_session IS NULL OR updated_by_session = '')
+            ''', (spreadsheet_id, since_timestamp, exclude_session_id))
+        else:
+            cursor.execute('''
+                SELECT ma, date, status, updated_at FROM attendance
+                WHERE spreadsheet_id = ? AND updated_at > ?
+            ''', (spreadsheet_id, since_timestamp))
+    except Exception as e:
+        # Fallback if updated_by_session column doesn't exist yet
+        print(f"Warning: updated_by_session column may not exist: {e}")
         cursor.execute('''
             SELECT ma, date, status, updated_at FROM attendance
             WHERE spreadsheet_id = ? AND updated_at > ?
