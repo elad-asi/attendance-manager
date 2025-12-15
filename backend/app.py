@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '1.0.2'  # Debug sync logging
+BE_VERSION = '1.0.10'  # Fix sync after backup restore
 
 # NOTE: Active users are now tracked in SQLite database (see database.py)
 # This allows multi-worker deployments (like Gunicorn) to share state

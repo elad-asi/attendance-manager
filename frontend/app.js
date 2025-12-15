@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '1.0.3';  // Debug poll sync
+const FE_VERSION = '1.0.10';  // Fix sync after backup restore
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds

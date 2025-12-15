@@ -726,6 +726,9 @@ def restore_from_cloud(bin_id):
         with open(DATABASE_FILE, 'wb') as f:
             f.write(result['content'])
 
+        # After restore, ensure schema is up to date and mark all records for sync
+        db._post_restore_sync_setup()
+
         return {
             'success': True,
             'message': f"Restored from {result['filename']}"

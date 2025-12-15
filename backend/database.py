@@ -105,9 +105,40 @@ def restore_backup(backup_filename):
 
         # Copy backup file to database location
         shutil.copy2(backup_path, DATABASE_FILE)
+
+        # After restore, ensure schema is up to date and mark all records for sync
+        _post_restore_sync_setup()
+
         return True, f"Successfully restored from {backup_filename}"
     except Exception as e:
         return False, f"Restore failed: {str(e)}"
+
+def _post_restore_sync_setup():
+    """After restoring a backup, ensure sync column exists and mark all records for sync"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Check if updated_by_session column exists
+    cursor.execute("PRAGMA table_info(attendance)")
+    columns = [col['name'] for col in cursor.fetchall()]
+
+    if 'updated_by_session' not in columns:
+        # Add the column
+        cursor.execute('ALTER TABLE attendance ADD COLUMN updated_by_session TEXT DEFAULT ""')
+        print("Post-restore: Added updated_by_session column")
+
+    # Mark ALL attendance records with a special "restore" session ID
+    # This ensures all connected clients will receive these records on next poll
+    restore_session = 'restore_' + datetime.now().strftime('%Y%m%d_%H%M%S')
+    cursor.execute('''
+        UPDATE attendance
+        SET updated_by_session = ?, updated_at = ?
+    ''', (restore_session, datetime.now().isoformat()))
+
+    affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+    print(f"Post-restore: Marked {affected} attendance records for sync with session {restore_session}")
 
 def init_database():
     """Initialize the database schema - using spreadsheet_id (Google Sheet ID) as primary key"""
