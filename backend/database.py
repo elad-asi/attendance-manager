@@ -157,10 +157,17 @@ def init_database():
             date TEXT NOT NULL,
             status TEXT DEFAULT 'unmarked',
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_by_session TEXT DEFAULT '',
             FOREIGN KEY (spreadsheet_id) REFERENCES sheets(spreadsheet_id) ON DELETE CASCADE,
             UNIQUE(spreadsheet_id, ma, date)
         )
     ''')
+
+    # Add updated_by_session column if it doesn't exist (migration)
+    try:
+        cursor.execute('ALTER TABLE attendance ADD COLUMN updated_by_session TEXT DEFAULT ""')
+    except:
+        pass  # Column already exists
 
     # Active users table - linked directly to spreadsheet_id
     cursor.execute('''
@@ -331,7 +338,7 @@ def get_team_members(spreadsheet_id):
         })
     return members
 
-def update_attendance(spreadsheet_id, ma, date, status):
+def update_attendance(spreadsheet_id, ma, date, status, session_id=''):
     """Update attendance for a specific member and date"""
     # Get timestamp before operation for validation
     before_mtime = get_db_mtime()
@@ -343,9 +350,9 @@ def update_attendance(spreadsheet_id, ma, date, status):
     cursor = conn.cursor()
 
     cursor.execute('''
-        INSERT OR REPLACE INTO attendance (spreadsheet_id, ma, date, status, updated_at)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (spreadsheet_id, ma, date, status, datetime.now().isoformat()))
+        INSERT OR REPLACE INTO attendance (spreadsheet_id, ma, date, status, updated_at, updated_by_session)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (spreadsheet_id, ma, date, status, datetime.now().isoformat(), session_id))
 
     conn.commit()
     conn.close()
@@ -372,6 +379,41 @@ def get_attendance(spreadsheet_id):
         attendance_data[ma][row['date']] = row['status']
 
     return attendance_data
+
+def get_attendance_changes_since(spreadsheet_id, since_timestamp, exclude_session_id=''):
+    """Get attendance changes since a timestamp, optionally excluding changes by a specific session"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    if exclude_session_id:
+        cursor.execute('''
+            SELECT ma, date, status, updated_at FROM attendance
+            WHERE spreadsheet_id = ? AND updated_at > ? AND (updated_by_session != ? OR updated_by_session IS NULL OR updated_by_session = '')
+        ''', (spreadsheet_id, since_timestamp, exclude_session_id))
+    else:
+        cursor.execute('''
+            SELECT ma, date, status, updated_at FROM attendance
+            WHERE spreadsheet_id = ? AND updated_at > ?
+        ''', (spreadsheet_id, since_timestamp))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    # Return as list of changes with metadata
+    changes = []
+    for row in rows:
+        changes.append({
+            'ma': row['ma'],
+            'date': row['date'],
+            'status': row['status'],
+            'updated_at': row['updated_at']
+        })
+
+    return changes
+
+def get_server_timestamp():
+    """Get current server timestamp in ISO format"""
+    return datetime.now().isoformat()
 
 def get_all_sheets():
     """Get list of all sheets"""

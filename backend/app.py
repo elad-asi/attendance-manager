@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '0.9.10'  # Fixed race condition in poll vs save
+BE_VERSION = '0.9.11'  # Incremental sync - poll only gets changes from others
 
 # NOTE: Active users are now tracked in SQLite database (see database.py)
 # This allows multi-worker deployments (like Gunicorn) to share state
@@ -153,12 +153,13 @@ def update_sheet_attendance(spreadsheet_id):
     ma = req.get('ma')
     date = req.get('date')
     status = req.get('status')
+    session_id = req.get('sessionId', '')  # Track who made the change
 
     if not all([ma, date, status]):
         return jsonify({'error': 'Missing ma, date, or status'}), 400
 
-    db.update_attendance(spreadsheet_id, ma, date, status)
-    return jsonify({'success': True})
+    db.update_attendance(spreadsheet_id, ma, date, status, session_id)
+    return jsonify({'success': True, 'serverTimestamp': db.get_server_timestamp()})
 
 # ============================================
 # Date Range API (Sheet-based)
@@ -551,10 +552,11 @@ def auth_logout():
 
 @app.route('/api/sheets/<spreadsheet_id>/heartbeat', methods=['POST'])
 def heartbeat(spreadsheet_id):
-    """Register user activity on a sheet and return current data + active users"""
+    """Register user activity and return only changes since last sync (from other users)"""
     req = request.json or {}
     user_email = req.get('email', 'Anonymous')
     session_id = req.get('sessionId', 'unknown')
+    last_sync = req.get('lastSync', '')  # ISO timestamp of last sync
 
     # Update active users in database (shared across all workers)
     db.update_active_user(session_id, user_email, spreadsheet_id, time.time())
@@ -562,21 +564,38 @@ def heartbeat(spreadsheet_id):
     # Get list of other active users on this sheet (exclude current session)
     other_users = db.get_active_users_for_sheet(spreadsheet_id, exclude_session=session_id)
 
-    # Get current data from database
-    sheet = db.get_sheet_by_id(spreadsheet_id)
-    if not sheet:
-        return jsonify({'error': 'Sheet not found'}), 404
+    # Get current server timestamp
+    server_timestamp = db.get_server_timestamp()
 
-    team_members = db.get_team_members(spreadsheet_id)
-    attendance_data = db.get_attendance(spreadsheet_id)
+    # If client has lastSync, only return changes from OTHER users since that time
+    if last_sync:
+        # Get only changes made by other users since last sync
+        changes = db.get_attendance_changes_since(spreadsheet_id, last_sync, exclude_session_id=session_id)
+        return jsonify({
+            'success': True,
+            'mode': 'incremental',
+            'changes': changes,
+            'serverTimestamp': server_timestamp,
+            'activeUsers': other_users
+        })
+    else:
+        # First sync - return full data
+        sheet = db.get_sheet_by_id(spreadsheet_id)
+        if not sheet:
+            return jsonify({'error': 'Sheet not found'}), 404
 
-    return jsonify({
-        'success': True,
-        'sheet': sheet,
-        'teamMembers': team_members,
-        'attendanceData': attendance_data,
-        'activeUsers': other_users
-    })
+        team_members = db.get_team_members(spreadsheet_id)
+        attendance_data = db.get_attendance(spreadsheet_id)
+
+        return jsonify({
+            'success': True,
+            'mode': 'full',
+            'sheet': sheet,
+            'teamMembers': team_members,
+            'attendanceData': attendance_data,
+            'serverTimestamp': server_timestamp,
+            'activeUsers': other_users
+        })
 
 @app.route('/api/sheets/<spreadsheet_id>/active-users', methods=['GET'])
 def get_active_users(spreadsheet_id):

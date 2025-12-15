@@ -3,13 +3,14 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.9.10';  // Fix race condition in poll vs save
+const FE_VERSION = '0.9.11';  // Incremental sync - poll only gets changes from others
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
 let pollIntervalId = null;
 let currentUserEmail = null;
 let isSaving = false; // Flag to prevent poll from overwriting during save
+let lastSyncTimestamp = ''; // Track last sync time for incremental updates
 
 // Unique session ID for this browser tab (allows same user on multiple machines)
 const SESSION_ID = generateSessionId();
@@ -545,7 +546,8 @@ async function pollForUpdates() {
     try {
         const response = await apiPost(`/sheets/${currentSpreadsheetId}/heartbeat`, {
             email: currentUserEmail || 'Anonymous',
-            sessionId: SESSION_ID
+            sessionId: SESSION_ID,
+            lastSync: lastSyncTimestamp  // Send last sync time for incremental updates
         });
 
         if (response.error) {
@@ -559,13 +561,20 @@ async function pollForUpdates() {
             return;
         }
 
-        // Check if data has changed by comparing attendance data
-        const newAttendanceStr = JSON.stringify(response.attendanceData);
-        const currentAttendanceStr = JSON.stringify(attendanceData);
+        // Update lastSync timestamp for next poll
+        if (response.serverTimestamp) {
+            lastSyncTimestamp = response.serverTimestamp;
+        }
 
-        if (newAttendanceStr !== currentAttendanceStr) {
-            // Data changed - update local state and re-render
-            console.log('Data changed from server, updating...');
+        if (response.mode === 'incremental') {
+            // Apply only changes from other users
+            if (response.changes && response.changes.length > 0) {
+                console.log(`Applying ${response.changes.length} changes from other users`);
+                applyAttendanceChanges(response.changes);
+            }
+        } else if (response.mode === 'full') {
+            // First sync - full data load
+            console.log('Full sync from server');
             teamMembers = response.teamMembers || [];
             attendanceData = response.attendanceData || {};
 
@@ -582,6 +591,50 @@ async function pollForUpdates() {
 
     } catch (error) {
         console.error('Polling error:', error);
+    }
+}
+
+function applyAttendanceChanges(changes) {
+    // Apply each change to local state and update only those cells
+    let needsRerender = false;
+
+    for (const change of changes) {
+        const { ma, date, status } = change;
+
+        // Update local attendanceData
+        if (!attendanceData[ma]) {
+            attendanceData[ma] = {};
+        }
+        attendanceData[ma][date] = status;
+
+        // Try to update the cell directly without full re-render
+        const cell = document.querySelector(`td[data-ma="${ma}"][data-date="${date}"]`);
+        if (cell) {
+            cell.className = `attendance-cell ${status}`;
+            cell.textContent = getStatusSymbol(status);
+        } else {
+            needsRerender = true;
+        }
+    }
+
+    // Update totals for affected dates
+    const affectedDates = [...new Set(changes.map(c => c.date))];
+    for (const date of affectedDates) {
+        updateTotals(date);
+    }
+
+    // Update member totals for affected members
+    const affectedMembers = [...new Set(changes.map(c => c.ma))];
+    for (const ma of affectedMembers) {
+        updateMemberTotals(ma);
+    }
+
+    // Update unit selector
+    renderUnitSelector();
+
+    // If any cell wasn't found, do a full re-render
+    if (needsRerender) {
+        renderTable();
     }
 }
 
@@ -785,9 +838,18 @@ async function saveAttendanceToBackend(ma, date, status) {
     isSaving = true;
 
     try {
-        const result = await apiPost(`/sheets/${currentSpreadsheetId}/attendance`, { ma, date, status });
+        const result = await apiPost(`/sheets/${currentSpreadsheetId}/attendance`, {
+            ma,
+            date,
+            status,
+            sessionId: SESSION_ID  // Track who made this change
+        });
         if (result.success) {
             showSaveToast('נשמר בשרת');
+            // Update lastSyncTimestamp so we don't re-fetch our own change
+            if (result.serverTimestamp) {
+                lastSyncTimestamp = result.serverTimestamp;
+            }
         } else {
             showSaveToast('שגיאה בשמירה', true);
         }
