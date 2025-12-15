@@ -17,37 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '0.9.5'
-
-# ============================================
-# Helper: Resolve Google Identifiers to Sheet ID
-# ============================================
-
-def resolve_sheet_id_from_request(req_data=None, query_args=None):
-    """
-    Resolve internal sheet_id from Google identifiers.
-    Accepts either request JSON body or query args.
-    Returns (sheet_id, error_response) tuple - error_response is None if successful
-    """
-    if req_data is None:
-        req_data = {}
-    if query_args is None:
-        query_args = {}
-
-    # Get identifiers from body or query params
-    spreadsheet_id = req_data.get('spreadsheetId') or query_args.get('spreadsheet_id')
-    sheet_name = req_data.get('sheetName') or query_args.get('sheet_name')
-    gdud = req_data.get('gdud', '') or query_args.get('gdud', '')
-    pluga = req_data.get('pluga', '') or query_args.get('pluga', '')
-
-    if not spreadsheet_id or not sheet_name:
-        return None, ({'error': 'Missing spreadsheetId or sheetName'}, 400)
-
-    sheet_id = db.get_sheet_id_by_google_identifiers(spreadsheet_id, sheet_name, gdud, pluga)
-    if not sheet_id:
-        return None, ({'error': 'Sheet not found for given identifiers'}, 404)
-
-    return sheet_id, None
+BE_VERSION = '0.9.7'  # Using spreadsheet_id as primary key
 
 # NOTE: Active users are now tracked in SQLite database (see database.py)
 # This allows multi-worker deployments (like Gunicorn) to share state
@@ -91,15 +61,15 @@ def get_all_sheets():
     sheets = db.get_all_sheets()
     return jsonify(sheets)
 
-@app.route('/api/sheets/<int:sheet_id>', methods=['GET'])
-def get_sheet(sheet_id):
+@app.route('/api/sheets/<spreadsheet_id>', methods=['GET'])
+def get_sheet(spreadsheet_id):
     """Get a specific sheet with all its data"""
-    sheet = db.get_sheet_by_id(sheet_id)
+    sheet = db.get_sheet_by_id(spreadsheet_id)
     if not sheet:
         return jsonify({'error': 'Sheet not found'}), 404
 
-    team_members = db.get_team_members(sheet_id)
-    attendance_data = db.get_attendance(sheet_id)
+    team_members = db.get_team_members(spreadsheet_id)
+    attendance_data = db.get_attendance(spreadsheet_id)
 
     return jsonify({
         'sheet': sheet,
@@ -107,38 +77,43 @@ def get_sheet(sheet_id):
         'attendanceData': attendance_data
     })
 
-@app.route('/api/sheets/<int:sheet_id>', methods=['DELETE'])
-def delete_sheet(sheet_id):
+@app.route('/api/sheets/<spreadsheet_id>', methods=['DELETE'])
+def delete_sheet(spreadsheet_id):
     """Delete a sheet and all its data"""
-    db.delete_sheet(sheet_id)
+    db.delete_sheet(spreadsheet_id)
     return jsonify({'success': True})
 
 @app.route('/api/sheets/load', methods=['POST'])
 def load_or_create_sheet():
-    """Load existing sheet or create new one, save team members"""
+    """Load existing sheet or create new one, save team members.
+
+    Uses spreadsheet_id (Google Sheet ID) as the primary identifier.
+    No internal IDs - the Google Sheet ID IS the identifier.
+    """
     req = request.json
     spreadsheet_id = req.get('spreadsheetId')
-    sheet_name = req.get('sheetName')
+    sheet_name = req.get('sheetName', '')
     gdud = req.get('gdud', '')
     pluga = req.get('pluga', '')
+    spreadsheet_title = req.get('spreadsheetTitle', '')
     members = req.get('members', [])
 
-    if not spreadsheet_id or not sheet_name:
-        return jsonify({'error': 'Missing spreadsheetId or sheetName'}), 400
+    if not spreadsheet_id:
+        return jsonify({'error': 'Missing spreadsheetId'}), 400
 
-    # Get or create sheet
-    sheet_id = db.get_or_create_sheet(spreadsheet_id, sheet_name, gdud, pluga)
+    # Get or create sheet - returns the same spreadsheet_id
+    db.get_or_create_sheet(spreadsheet_id, sheet_name, gdud, pluga, spreadsheet_title)
 
     # Save team members
-    db.save_team_members(sheet_id, members)
+    db.save_team_members(spreadsheet_id, members)
 
     # Get existing attendance data
-    attendance_data = db.get_attendance(sheet_id)
-    sheet = db.get_sheet_by_id(sheet_id)
+    attendance_data = db.get_attendance(spreadsheet_id)
+    sheet = db.get_sheet_by_id(spreadsheet_id)
 
     return jsonify({
         'success': True,
-        'sheetId': sheet_id,
+        'spreadsheetId': spreadsheet_id,  # Return Google Sheet ID directly
         'sheet': sheet,
         'teamMembers': members,
         'attendanceData': attendance_data
@@ -148,31 +123,31 @@ def load_or_create_sheet():
 # Team Members API (Sheet-based)
 # ============================================
 
-@app.route('/api/sheets/<int:sheet_id>/team-members', methods=['GET'])
-def get_sheet_team_members(sheet_id):
+@app.route('/api/sheets/<spreadsheet_id>/team-members', methods=['GET'])
+def get_sheet_team_members(spreadsheet_id):
     """Get all team members for a sheet"""
-    members = db.get_team_members(sheet_id)
+    members = db.get_team_members(spreadsheet_id)
     return jsonify(members)
 
-@app.route('/api/sheets/<int:sheet_id>/team-members', methods=['POST'])
-def save_sheet_team_members(sheet_id):
+@app.route('/api/sheets/<spreadsheet_id>/team-members', methods=['POST'])
+def save_sheet_team_members(spreadsheet_id):
     """Save team members for a sheet"""
     members = request.json.get('members', [])
-    db.save_team_members(sheet_id, members)
+    db.save_team_members(spreadsheet_id, members)
     return jsonify({'success': True, 'count': len(members)})
 
 # ============================================
 # Attendance API (Sheet-based)
 # ============================================
 
-@app.route('/api/sheets/<int:sheet_id>/attendance', methods=['GET'])
-def get_sheet_attendance(sheet_id):
+@app.route('/api/sheets/<spreadsheet_id>/attendance', methods=['GET'])
+def get_sheet_attendance(spreadsheet_id):
     """Get all attendance data for a sheet"""
-    attendance = db.get_attendance(sheet_id)
+    attendance = db.get_attendance(spreadsheet_id)
     return jsonify(attendance)
 
-@app.route('/api/sheets/<int:sheet_id>/attendance', methods=['POST'])
-def update_sheet_attendance(sheet_id):
+@app.route('/api/sheets/<spreadsheet_id>/attendance', methods=['POST'])
+def update_sheet_attendance(spreadsheet_id):
     """Update attendance for a specific member and date"""
     req = request.json
     ma = req.get('ma')
@@ -182,17 +157,17 @@ def update_sheet_attendance(sheet_id):
     if not all([ma, date, status]):
         return jsonify({'error': 'Missing ma, date, or status'}), 400
 
-    db.update_attendance(sheet_id, ma, date, status)
+    db.update_attendance(spreadsheet_id, ma, date, status)
     return jsonify({'success': True})
 
 # ============================================
 # Date Range API (Sheet-based)
 # ============================================
 
-@app.route('/api/sheets/<int:sheet_id>/date-range', methods=['GET'])
-def get_sheet_date_range(sheet_id):
+@app.route('/api/sheets/<spreadsheet_id>/date-range', methods=['GET'])
+def get_sheet_date_range(spreadsheet_id):
     """Get the date range for a sheet"""
-    sheet = db.get_sheet_by_id(sheet_id)
+    sheet = db.get_sheet_by_id(spreadsheet_id)
     if not sheet:
         return jsonify({'error': 'Sheet not found'}), 404
     return jsonify({
@@ -200,15 +175,15 @@ def get_sheet_date_range(sheet_id):
         'endDate': sheet.get('end_date', '2026-02-01')
     })
 
-@app.route('/api/sheets/<int:sheet_id>/date-range', methods=['POST'])
-def set_sheet_date_range(sheet_id):
+@app.route('/api/sheets/<spreadsheet_id>/date-range', methods=['POST'])
+def set_sheet_date_range(spreadsheet_id):
     """Set the date range for a sheet"""
     req = request.json
     start_date = req.get('startDate')
     end_date = req.get('endDate')
 
     if start_date and end_date:
-        db.update_sheet_dates(sheet_id, start_date, end_date)
+        db.update_sheet_dates(spreadsheet_id, start_date, end_date)
 
     return jsonify({'success': True})
 
@@ -216,15 +191,15 @@ def set_sheet_date_range(sheet_id):
 # Export API (Sheet-based)
 # ============================================
 
-@app.route('/api/sheets/<int:sheet_id>/export', methods=['GET'])
-def export_sheet_data(sheet_id):
+@app.route('/api/sheets/<spreadsheet_id>/export', methods=['GET'])
+def export_sheet_data(spreadsheet_id):
     """Export all data for a sheet"""
-    sheet = db.get_sheet_by_id(sheet_id)
+    sheet = db.get_sheet_by_id(spreadsheet_id)
     if not sheet:
         return jsonify({'error': 'Sheet not found'}), 404
 
-    team_members = db.get_team_members(sheet_id)
-    attendance_data = db.get_attendance(sheet_id)
+    team_members = db.get_team_members(spreadsheet_id)
+    attendance_data = db.get_attendance(spreadsheet_id)
 
     return jsonify({
         'sheet': sheet,
@@ -496,12 +471,8 @@ def get_version():
 
 @app.route('/api/migrate', methods=['POST'])
 def run_migration():
-    """Run database migrations to add new tables"""
-    try:
-        db.ensure_active_users_table()
-        return jsonify({'success': True, 'message': 'Migration completed'})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+    """Run database migrations (v0.10 - already using spreadsheet_id as primary key)"""
+    return jsonify({'success': True, 'message': 'Database already up to date (spreadsheet_id is primary key)'})
 
 # ============================================
 # Email Authentication API
@@ -578,26 +549,26 @@ def auth_logout():
 # Active Users Tracking (Database-backed for multi-worker support)
 # ============================================
 
-@app.route('/api/sheets/<int:sheet_id>/heartbeat', methods=['POST'])
-def heartbeat(sheet_id):
+@app.route('/api/sheets/<spreadsheet_id>/heartbeat', methods=['POST'])
+def heartbeat(spreadsheet_id):
     """Register user activity on a sheet and return current data + active users"""
     req = request.json or {}
     user_email = req.get('email', 'Anonymous')
     session_id = req.get('sessionId', 'unknown')
 
     # Update active users in database (shared across all workers)
-    db.update_active_user(session_id, user_email, sheet_id, time.time())
+    db.update_active_user(session_id, user_email, spreadsheet_id, time.time())
 
     # Get list of other active users on this sheet (exclude current session)
-    other_users = db.get_active_users_for_sheet(sheet_id, exclude_session=session_id)
+    other_users = db.get_active_users_for_sheet(spreadsheet_id, exclude_session=session_id)
 
     # Get current data from database
-    sheet = db.get_sheet_by_id(sheet_id)
+    sheet = db.get_sheet_by_id(spreadsheet_id)
     if not sheet:
         return jsonify({'error': 'Sheet not found'}), 404
 
-    team_members = db.get_team_members(sheet_id)
-    attendance_data = db.get_attendance(sheet_id)
+    team_members = db.get_team_members(spreadsheet_id)
+    attendance_data = db.get_attendance(spreadsheet_id)
 
     return jsonify({
         'success': True,
@@ -607,10 +578,10 @@ def heartbeat(sheet_id):
         'activeUsers': other_users
     })
 
-@app.route('/api/sheets/<int:sheet_id>/active-users', methods=['GET'])
-def get_active_users(sheet_id):
+@app.route('/api/sheets/<spreadsheet_id>/active-users', methods=['GET'])
+def get_active_users(spreadsheet_id):
     """Get list of active users on a sheet"""
-    users_on_sheet = db.get_all_active_users_for_sheet(sheet_id)
+    users_on_sheet = db.get_all_active_users_for_sheet(spreadsheet_id)
 
     return jsonify({
         'activeUsers': users_on_sheet
@@ -639,17 +610,17 @@ def compare_backup(filename):
     current_conn = db.get_db_connection()
     current_cursor = current_conn.cursor()
     current_cursor.execute('''
-        SELECT a.sheet_id, a.ma, a.date, a.status, t.first_name, t.last_name
+        SELECT a.spreadsheet_id, a.ma, a.date, a.status, t.first_name, t.last_name
         FROM attendance a
-        LEFT JOIN team_members t ON a.sheet_id = t.sheet_id AND a.ma = t.ma
+        LEFT JOIN team_members t ON a.spreadsheet_id = t.spreadsheet_id AND a.ma = t.ma
     ''')
-    current_data = {f"{row['sheet_id']}_{row['ma']}_{row['date']}": {
+    current_data = {f"{row['spreadsheet_id']}_{row['ma']}_{row['date']}": {
         'status': row['status'],
         'firstName': row['first_name'] or '',
         'lastName': row['last_name'] or '',
         'ma': row['ma'],
         'date': row['date'],
-        'sheet_id': row['sheet_id']
+        'spreadsheet_id': row['spreadsheet_id']
     } for row in current_cursor.fetchall()}
     current_conn.close()
 
@@ -662,26 +633,42 @@ def compare_backup(filename):
     backup_cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='team_members'")
     has_team_members = backup_cursor.fetchone() is not None
 
-    if has_team_members:
-        backup_cursor.execute('''
-            SELECT a.sheet_id, a.ma, a.date, a.status, t.first_name, t.last_name
-            FROM attendance a
-            LEFT JOIN team_members t ON a.sheet_id = t.sheet_id AND a.ma = t.ma
-        ''')
-    else:
-        backup_cursor.execute('SELECT sheet_id, ma, date, status FROM attendance')
+    # Check if backup uses new schema (spreadsheet_id) or old (sheet_id)
+    backup_cursor.execute("PRAGMA table_info(attendance)")
+    columns = [col[1] for col in backup_cursor.fetchall()]
+    uses_new_schema = 'spreadsheet_id' in columns
 
     backup_data = {}
-    for row in backup_cursor.fetchall():
-        key = f"{row['sheet_id']}_{row['ma']}_{row['date']}"
-        backup_data[key] = {
-            'status': row['status'],
-            'firstName': row['first_name'] if has_team_members and row['first_name'] else '',
-            'lastName': row['last_name'] if has_team_members and row['last_name'] else '',
-            'ma': row['ma'],
-            'date': row['date'],
-            'sheet_id': row['sheet_id']
-        }
+    if uses_new_schema:
+        if has_team_members:
+            backup_cursor.execute('''
+                SELECT a.spreadsheet_id, a.ma, a.date, a.status, t.first_name, t.last_name
+                FROM attendance a
+                LEFT JOIN team_members t ON a.spreadsheet_id = t.spreadsheet_id AND a.ma = t.ma
+            ''')
+        else:
+            backup_cursor.execute('SELECT spreadsheet_id, ma, date, status FROM attendance')
+
+        for row in backup_cursor.fetchall():
+            key = f"{row['spreadsheet_id']}_{row['ma']}_{row['date']}"
+            backup_data[key] = {
+                'status': row['status'],
+                'firstName': row['first_name'] if has_team_members and 'first_name' in row.keys() else '',
+                'lastName': row['last_name'] if has_team_members and 'last_name' in row.keys() else '',
+                'ma': row['ma'],
+                'date': row['date'],
+                'spreadsheet_id': row['spreadsheet_id']
+            }
+    else:
+        # Old schema - skip comparison (incompatible)
+        backup_conn.close()
+        return jsonify({
+            'filename': filename,
+            'totalDifferences': 0,
+            'differences': [],
+            'warning': 'Backup uses old schema - cannot compare'
+        })
+
     backup_conn.close()
 
     # Find differences

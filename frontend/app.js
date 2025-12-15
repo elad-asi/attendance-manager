@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '0.9.5';
+const FE_VERSION = '0.9.7';  // Using spreadsheet_id (Google Sheet ID) as primary key
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -25,7 +25,7 @@ function generateSessionId() {
 }
 
 // API Base URL - Use Render server for multi-user testing
-const API_BASE = 'https://attendance-manager-slzl.onrender.com/api';
+const API_BASE = '/api';
 
 // State management
 let teamMembers = [];
@@ -33,8 +33,7 @@ let attendanceData = {};
 let startDate = new Date('2025-12-21');
 let endDate = new Date('2026-02-01');
 
-// Current sheet ID (for multi-user support)
-let currentSheetId = null;
+// REMOVED: currentSheetId - now using currentSpreadsheetId (Google Sheet ID) as the only identifier
 
 // Filter state - now supports multi-select (arrays)
 let filters = {
@@ -43,8 +42,8 @@ let filters = {
     mahlaka: []
 };
 
-// Current active unit tab
-let activeUnitTab = 'all';
+// Current active unit tabs (multi-select: empty array = all units)
+let activeUnitTabs = [];
 
 // Special constant for empty filter value
 const EMPTY_FILTER_VALUE = 'ריק';
@@ -471,7 +470,7 @@ function updateSheetUI() {
     const sheetNameDisplayEl = document.getElementById('sheetNameDisplay');
     const spreadsheetIdDisplayEl = document.getElementById('spreadsheetIdDisplay');
 
-    if (sheetInfoDisplay && currentSheetId) {
+    if (sheetInfoDisplay && currentSpreadsheetId) {
         // Show the sheet info section
         sheetInfoDisplay.style.display = 'block';
 
@@ -495,7 +494,7 @@ function updateSheetUI() {
     }
 
     // Start or stop polling based on whether we have an active sheet
-    if (currentSheetId) {
+    if (currentSpreadsheetId) {
         startPolling();
     } else {
         stopPolling();
@@ -537,10 +536,10 @@ function stopPolling() {
 }
 
 async function pollForUpdates() {
-    if (!currentSheetId) return;
+    if (!currentSpreadsheetId) return;
 
     try {
-        const response = await apiPost(`/sheets/${currentSheetId}/heartbeat`, {
+        const response = await apiPost(`/sheets/${currentSpreadsheetId}/heartbeat`, {
             email: currentUserEmail || 'Anonymous',
             sessionId: SESSION_ID
         });
@@ -603,7 +602,7 @@ function updateActiveUsersDisplay(activeUsers) {
 }
 
 async function refreshDataFromBackend() {
-    if (!currentSheetId) {
+    if (!currentSpreadsheetId) {
         alert('אין גיליון נטען');
         return;
     }
@@ -613,7 +612,7 @@ async function refreshDataFromBackend() {
     refreshBtn.textContent = '🔄 טוען...';
 
     try {
-        const response = await apiGet(`/sheets/${currentSheetId}`);
+        const response = await apiGet(`/sheets/${currentSpreadsheetId}`);
 
         if (response.error) {
             throw new Error(response.error);
@@ -651,7 +650,6 @@ function disconnectCurrentSheet() {
     stopPolling();
 
     // Clear local state
-    currentSheetId = null;
     currentSpreadsheetId = null;
     currentSpreadsheetTitle = null;
     currentSheetName = null;
@@ -660,12 +658,11 @@ function disconnectCurrentSheet() {
     attendanceData = {};
 
     // Clear localStorage
-    localStorage.removeItem('current_sheet_id');
     localStorage.removeItem('current_spreadsheet_id');
     localStorage.removeItem('current_sheet_info');
     localStorage.removeItem('skipped_columns');
     localStorage.removeItem('permanently_skipped_columns');
-    skippedColumns = [];
+    skippedColumns = ['miktzoaTzvai'];  // Default: hide miktzoaTzvai
     permanentlySkippedColumns = [];
 
     // Also sign out from Google
@@ -714,19 +711,18 @@ async function loadFromBackend() {
             skippedColumns = ['miktzoaTzvai'];
         }
 
-        // Check if we have a stored sheet ID
-        const storedSheetId = localStorage.getItem('current_sheet_id');
-        if (storedSheetId) {
-            currentSheetId = parseInt(storedSheetId);
+        // Check if we have a stored spreadsheet ID (Google Sheet ID is now the primary key)
+        const storedSpreadsheetId = localStorage.getItem('current_spreadsheet_id');
+        if (storedSpreadsheetId) {
+            currentSpreadsheetId = storedSpreadsheetId;
 
-            // Load sheet data
-            const response = await apiGet(`/sheets/${currentSheetId}`);
+            // Load sheet data using Google Sheet ID
+            const response = await apiGet(`/sheets/${currentSpreadsheetId}`);
 
             if (response.error) {
                 // Sheet not found, clear storage
-                localStorage.removeItem('current_sheet_id');
+                localStorage.removeItem('current_spreadsheet_id');
                 localStorage.removeItem('current_sheet_info');
-                currentSheetId = null;
                 currentSpreadsheetId = null;
             } else {
                 teamMembers = response.teamMembers || [];
@@ -737,21 +733,19 @@ async function loadFromBackend() {
                     endDate = new Date(response.sheet.end_date);
                     document.getElementById('startDate').value = response.sheet.start_date;
                     document.getElementById('endDate').value = response.sheet.end_date;
-                    // Restore Google Spreadsheet ID for display
-                    currentSpreadsheetId = response.sheet.spreadsheet_id || null;
                     currentSheetName = response.sheet.sheet_name || null;
+                    currentSpreadsheetTitle = response.sheet.spreadsheet_title || null;
                 }
 
-                // Restore sheet info from localStorage (for title which isn't stored in DB)
+                // Restore additional sheet info from localStorage (for title if not in DB)
                 const storedSheetInfo = localStorage.getItem('current_sheet_info');
                 if (storedSheetInfo) {
                     const sheetInfo = JSON.parse(storedSheetInfo);
-                    currentSpreadsheetTitle = sheetInfo.spreadsheetTitle || null;
+                    if (!currentSpreadsheetTitle) {
+                        currentSpreadsheetTitle = sheetInfo.spreadsheetTitle || null;
+                    }
                     if (!currentSheetName) {
                         currentSheetName = sheetInfo.sheetName || null;
-                    }
-                    if (!currentSpreadsheetId) {
-                        currentSpreadsheetId = sheetInfo.spreadsheetId || null;
                     }
                 }
             }
@@ -771,14 +765,14 @@ async function loadFromBackend() {
 }
 
 async function saveAttendanceToBackend(ma, date, status) {
-    if (!currentSheetId) {
-        console.error('No sheet ID set - data not saved to server');
+    if (!currentSpreadsheetId) {
+        console.error('No spreadsheet ID set - data not saved to server');
         showSaveToast('לא מחובר לשרת', true);
         return;
     }
 
     try {
-        const result = await apiPost(`/sheets/${currentSheetId}/attendance`, { ma, date, status });
+        const result = await apiPost(`/sheets/${currentSpreadsheetId}/attendance`, { ma, date, status });
         if (result.success) {
             showSaveToast('נשמר בשרת');
         } else {
@@ -1269,10 +1263,10 @@ async function confirmColumnMapping() {
             throw new Error(loadResponse.error);
         }
 
-        // Store sheet ID and info
-        currentSheetId = loadResponse.sheetId;
+        // Store spreadsheet ID (Google Sheet ID is now the only identifier)
+        currentSpreadsheetId = loadResponse.spreadsheetId;
         currentSheetName = sheetName;  // Set the current sheet name for display
-        localStorage.setItem('current_sheet_id', currentSheetId);
+        localStorage.setItem('current_spreadsheet_id', currentSpreadsheetId);
         localStorage.setItem('current_sheet_info', JSON.stringify({
             sheetName: sheetName,
             spreadsheetTitle: currentSpreadsheetTitle,
@@ -1285,8 +1279,11 @@ async function confirmColumnMapping() {
         permanentlySkippedColumns = Object.keys(currentColumnMapping).filter(key => currentColumnMapping[key] === 'skip');
         localStorage.setItem('permanently_skipped_columns', JSON.stringify(permanentlySkippedColumns));
 
-        // Also set skippedColumns to include permanently skipped ones
+        // Also set skippedColumns to include permanently skipped ones + default hidden (miktzoaTzvai)
         skippedColumns = [...permanentlySkippedColumns];
+        if (!skippedColumns.includes('miktzoaTzvai')) {
+            skippedColumns.push('miktzoaTzvai');
+        }
         localStorage.setItem('skipped_columns', JSON.stringify(skippedColumns));
 
         // Update local state
@@ -1393,14 +1390,15 @@ function renderUnitTabs() {
     // Calculate counts for each unit
     const allCount = teamMembers.length;
 
-    // Build tabs HTML
-    let tabsHtml = `<button class="unit-tab ${activeUnitTab === 'all' ? 'active' : ''}" data-unit="all">
+    // Build tabs HTML - "הכל" is active when no specific units are selected
+    const allActive = activeUnitTabs.length === 0 ? 'active' : '';
+    let tabsHtml = `<button class="unit-tab ${allActive}" data-unit="all">
         הכל <span class="tab-count">${allCount}</span>
     </button>`;
 
     mahlakas.forEach(mahlaka => {
         const count = teamMembers.filter(m => m.mahlaka === mahlaka).length;
-        const isActive = activeUnitTab === mahlaka ? 'active' : '';
+        const isActive = activeUnitTabs.includes(mahlaka) ? 'active' : '';
         tabsHtml += `<button class="unit-tab ${isActive}" data-unit="${mahlaka}">
             ${mahlaka} <span class="tab-count">${count}</span>
         </button>`;
@@ -1415,11 +1413,26 @@ function renderUnitTabs() {
 }
 
 function handleUnitTabClick(unit) {
-    activeUnitTab = unit;
+    if (unit === 'all') {
+        // Clear all selections - show all units
+        activeUnitTabs = [];
+    } else {
+        // Toggle selection for this unit
+        const index = activeUnitTabs.indexOf(unit);
+        if (index === -1) {
+            activeUnitTabs.push(unit);
+        } else {
+            activeUnitTabs.splice(index, 1);
+        }
+    }
 
     // Update active state on tabs
     document.querySelectorAll('.unit-tab').forEach(tab => {
-        tab.classList.toggle('active', tab.dataset.unit === unit);
+        if (tab.dataset.unit === 'all') {
+            tab.classList.toggle('active', activeUnitTabs.length === 0);
+        } else {
+            tab.classList.toggle('active', activeUnitTabs.includes(tab.dataset.unit));
+        }
     });
 
     // Re-render the table with the new filter
@@ -1427,10 +1440,11 @@ function handleUnitTabClick(unit) {
 }
 
 function getUnitFilteredMembers(members) {
-    if (activeUnitTab === 'all') {
+    // Empty array means all units (no filter)
+    if (activeUnitTabs.length === 0) {
         return members;
     }
-    return members.filter(m => m.mahlaka === activeUnitTab);
+    return members.filter(m => activeUnitTabs.includes(m.mahlaka));
 }
 
 // ============================================
@@ -1793,6 +1807,9 @@ function renderTable() {
 
     // Add total rows (with unit-filtered members)
     renderTotalRows(tbody, dates, unitFilteredMembers);
+
+    // Update יממ summary section
+    updateYamamSummary();
 }
 
 function renderTotalRows(tbody, dates, filteredMembers) {
@@ -1853,6 +1870,70 @@ function calculateMemberTotal(ma, dates, statusList) {
         }
     });
     return count;
+}
+
+// Calculate and display יממ summary per unit (mahlaka) and grand total
+function updateYamamSummary() {
+    const summarySection = document.getElementById('yamamSummarySection');
+    const summaryContent = document.getElementById('yamamSummaryContent');
+
+    if (!summarySection || !summaryContent) return;
+
+    // Only show if we have team members
+    if (teamMembers.length === 0) {
+        summarySection.style.display = 'none';
+        return;
+    }
+
+    const dates = generateDateRange();
+    // Use ALL filtered members (by gdud/pluga), NOT filtered by unit tab
+    // This shows summary across ALL units
+    const filteredMembers = getFilteredMembers();
+
+    // Group members by mahlaka (unit)
+    const unitYamam = {};
+    let grandTotal = 0;
+
+    filteredMembers.forEach(member => {
+        const unit = member.mahlaka || 'ללא מחלקה';
+        const memberYamam = calculateMemberTotal(member.ma, dates, TOTALS_CONFIG.counted);
+
+        if (!unitYamam[unit]) {
+            unitYamam[unit] = 0;
+        }
+        unitYamam[unit] += memberYamam;
+        grandTotal += memberYamam;
+    });
+
+    // Build HTML for summary
+    let html = '';
+
+    // Sort units alphabetically but put 'ללא מחלקה' last
+    const units = Object.keys(unitYamam).sort((a, b) => {
+        if (a === 'ללא מחלקה') return 1;
+        if (b === 'ללא מחלקה') return -1;
+        return a.localeCompare(b, 'he');
+    });
+
+    units.forEach(unit => {
+        html += `
+            <div class="yamam-summary-item">
+                <div class="yamam-summary-label">${unit}</div>
+                <div class="yamam-summary-value">${unitYamam[unit]}</div>
+            </div>
+        `;
+    });
+
+    // Add grand total
+    html += `
+        <div class="yamam-summary-item total-item">
+            <div class="yamam-summary-label">סה"כ</div>
+            <div class="yamam-summary-value">${grandTotal}</div>
+        </div>
+    `;
+
+    summaryContent.innerHTML = html;
+    summarySection.style.display = 'block';
 }
 
 // Get allowed statuses based on previous day's status
@@ -1938,6 +2019,9 @@ async function cycleStatus(cell, ma, date) {
 
     // Update member's dorech and yamam totals
     updateMemberTotals(ma);
+
+    // Update יממ summary
+    updateYamamSummary();
 }
 
 function updateTotals(dateStr) {
@@ -1991,9 +2075,9 @@ async function applyDateRange() {
     startDate = new Date(newStartDate);
     endDate = new Date(newEndDate);
 
-    // Save to backend (sheet-specific if we have a sheet ID)
-    if (currentSheetId) {
-        await apiPost(`/sheets/${currentSheetId}/date-range`, {
+    // Save to backend (sheet-specific if we have a spreadsheet ID)
+    if (currentSpreadsheetId) {
+        await apiPost(`/sheets/${currentSpreadsheetId}/date-range`, {
             startDate: newStartDate,
             endDate: newEndDate
         });
@@ -2008,8 +2092,8 @@ async function applyDateRange() {
 
 async function exportData() {
     let data;
-    if (currentSheetId) {
-        data = await apiGet(`/sheets/${currentSheetId}/export`);
+    if (currentSpreadsheetId) {
+        data = await apiGet(`/sheets/${currentSpreadsheetId}/export`);
     } else {
         data = { teamMembers, attendanceData };
     }
@@ -2074,10 +2158,10 @@ async function clearAllData() {
         return;
     }
 
-    if (currentSheetId) {
-        await apiDelete(`/sheets/${currentSheetId}`);
-        currentSheetId = null;
-        localStorage.removeItem('current_sheet_id');
+    if (currentSpreadsheetId) {
+        await apiDelete(`/sheets/${currentSpreadsheetId}`);
+        currentSpreadsheetId = null;
+        localStorage.removeItem('current_spreadsheet_id');
         localStorage.removeItem('current_sheet_info');
     }
 
@@ -2350,12 +2434,11 @@ async function loadCloudBackupList() {
             return;
         }
 
-        // Filter by current sheet/spreadsheet - spreadsheet_id is critical for cross-machine sync
+        // Filter by current spreadsheet - spreadsheet_id (Google Sheet ID) is the only identifier
         let url = `${API_BASE}/cloud-backups`;
-        const params = [];
-        if (currentSheetId) params.push(`sheet_id=${currentSheetId}`);
-        if (currentSpreadsheetId) params.push(`spreadsheet_id=${currentSpreadsheetId}`);
-        if (params.length > 0) url += '?' + params.join('&');
+        if (currentSpreadsheetId) {
+            url += `?spreadsheet_id=${currentSpreadsheetId}`;
+        }
         const response = await fetch(url);
         const data = await response.json();
 

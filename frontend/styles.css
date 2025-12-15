@@ -1228,6 +1228,53 @@ thead .col-yamam {
     font-size: 1.1rem;
 }
 
+/* Yamam Summary Section */
+.yamam-summary-section {
+    margin-top: 20px;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    color: white;
+}
+
+.yamam-summary-section h3 {
+    margin: 0 0 15px 0;
+    font-size: 1.2rem;
+    text-align: center;
+}
+
+.yamam-summary-content {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    justify-content: center;
+}
+
+.yamam-summary-item {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 12px 20px;
+    min-width: 120px;
+    text-align: center;
+}
+
+.yamam-summary-item.total-item {
+    background: rgba(255, 255, 255, 0.25);
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    font-weight: bold;
+}
+
+.yamam-summary-label {
+    font-size: 0.85rem;
+    opacity: 0.9;
+    margin-bottom: 5px;
+}
+
+.yamam-summary-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
 /* Legend */
 .legend-section {
     padding: 20px 30px;

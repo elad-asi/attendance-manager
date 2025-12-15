@@ -65,6 +65,7 @@ def cleanup_old_backups():
     for old_backup in backups[MAX_BACKUPS:]:
         try:
             os.remove(old_backup)
+            print(f"Deleted old backup: {os.path.basename(old_backup)}")
         except OSError:
             pass
 
@@ -109,39 +110,32 @@ def restore_backup(backup_filename):
         return False, f"Restore failed: {str(e)}"
 
 def init_database():
-    """Initialize the database schema"""
+    """Initialize the database schema - using spreadsheet_id (Google Sheet ID) as primary key"""
     os.makedirs(os.path.join(SCRIPT_DIR, 'data'), exist_ok=True)
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Sheets table - each loaded Google Sheet is uniquely identified
+    # Sheets table - spreadsheet_id (Google Sheet ID) is the PRIMARY KEY
+    # This guarantees ONE and ONLY ONE entry per Google Sheet
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS sheets (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            spreadsheet_id TEXT NOT NULL,
+            spreadsheet_id TEXT PRIMARY KEY,
             spreadsheet_title TEXT DEFAULT '',
-            sheet_name TEXT NOT NULL,
+            sheet_name TEXT DEFAULT '',
             gdud TEXT DEFAULT '',
             pluga TEXT DEFAULT '',
             start_date TEXT DEFAULT '2025-12-21',
             end_date TEXT DEFAULT '2026-02-01',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(spreadsheet_id, sheet_name, gdud, pluga)
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     ''')
 
-    # Migration: Add spreadsheet_title column if it doesn't exist
-    try:
-        cursor.execute('ALTER TABLE sheets ADD COLUMN spreadsheet_title TEXT DEFAULT ""')
-    except:
-        pass  # Column already exists
-
-    # Team members table - linked to a sheet
+    # Team members table - linked directly to spreadsheet_id
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS team_members (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            sheet_id INTEGER NOT NULL,
+            spreadsheet_id TEXT NOT NULL,
             first_name TEXT DEFAULT '',
             last_name TEXT DEFAULT '',
             ma TEXT DEFAULT '',
@@ -150,127 +144,157 @@ def init_database():
             mahlaka TEXT DEFAULT '',
             miktzoa_tzvai TEXT DEFAULT '',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (sheet_id) REFERENCES sheets(id) ON DELETE CASCADE
+            FOREIGN KEY (spreadsheet_id) REFERENCES sheets(spreadsheet_id) ON DELETE CASCADE
         )
     ''')
 
-    # Attendance table - linked to team member and date
+    # Attendance table - linked directly to spreadsheet_id
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS attendance (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            sheet_id INTEGER NOT NULL,
+            spreadsheet_id TEXT NOT NULL,
             ma TEXT NOT NULL,
             date TEXT NOT NULL,
             status TEXT DEFAULT 'unmarked',
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (sheet_id) REFERENCES sheets(id) ON DELETE CASCADE,
-            UNIQUE(sheet_id, ma, date)
+            FOREIGN KEY (spreadsheet_id) REFERENCES sheets(spreadsheet_id) ON DELETE CASCADE,
+            UNIQUE(spreadsheet_id, ma, date)
         )
     ''')
 
-    # Active users table - for tracking who's online (shared across workers)
+    # Active users table - linked directly to spreadsheet_id
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS active_users (
             session_id TEXT PRIMARY KEY,
             email TEXT DEFAULT 'Anonymous',
-            sheet_id INTEGER NOT NULL,
+            spreadsheet_id TEXT NOT NULL,
             last_seen REAL NOT NULL,
-            FOREIGN KEY (sheet_id) REFERENCES sheets(id) ON DELETE CASCADE
+            FOREIGN KEY (spreadsheet_id) REFERENCES sheets(spreadsheet_id) ON DELETE CASCADE
         )
     ''')
 
     # Create indexes for faster lookups
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_attendance_sheet ON attendance(sheet_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_attendance_spreadsheet ON attendance(spreadsheet_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_attendance_ma ON attendance(ma)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_team_members_sheet ON team_members(sheet_id)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_active_users_sheet ON active_users(sheet_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_team_members_spreadsheet ON team_members(spreadsheet_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_active_users_spreadsheet ON active_users(spreadsheet_id)')
 
     conn.commit()
     conn.close()
 
-def get_or_create_sheet(spreadsheet_id, sheet_name, gdud='', pluga='', spreadsheet_title=''):
-    """Get existing sheet or create a new one, returns sheet_id"""
+def migrate_old_data():
+    """Migrate data from old schema (with sheet_id) to new schema (with spreadsheet_id)"""
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Try to find existing sheet
-    cursor.execute('''
-        SELECT id FROM sheets
-        WHERE spreadsheet_id = ? AND sheet_name = ? AND gdud = ? AND pluga = ?
-    ''', (spreadsheet_id, sheet_name, gdud, pluga))
+    # Check if old tables exist
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sheets'")
+    if not cursor.fetchone():
+        conn.close()
+        return
 
+    # Check if old schema has 'id' column (old format)
+    cursor.execute("PRAGMA table_info(sheets)")
+    columns = [col[1] for col in cursor.fetchall()]
+
+    if 'id' in columns and 'sheet_id' in [col[1] for col in cursor.execute("PRAGMA table_info(attendance)").fetchall()]:
+        print("Migrating old data to new schema...")
+
+        # Get all sheets with their old IDs and spreadsheet_ids
+        cursor.execute("SELECT id, spreadsheet_id, spreadsheet_title, sheet_name, gdud, pluga, start_date, end_date FROM sheets")
+        old_sheets = cursor.fetchall()
+
+        for old_sheet in old_sheets:
+            old_id = old_sheet['id']
+            spreadsheet_id = old_sheet['spreadsheet_id']
+
+            # Update attendance records
+            cursor.execute('''
+                UPDATE attendance SET spreadsheet_id = ? WHERE sheet_id = ?
+            ''', (spreadsheet_id, old_id))
+
+            # Update team_members records
+            cursor.execute('''
+                UPDATE team_members SET spreadsheet_id = ? WHERE sheet_id = ?
+            ''', (spreadsheet_id, old_id))
+
+            # Update active_users records
+            cursor.execute('''
+                UPDATE active_users SET spreadsheet_id = ? WHERE sheet_id = ?
+            ''', (spreadsheet_id, old_id))
+
+        conn.commit()
+        print("Migration completed")
+
+    conn.close()
+
+def get_or_create_sheet(spreadsheet_id, sheet_name='', gdud='', pluga='', spreadsheet_title=''):
+    """Get existing sheet or create a new one using spreadsheet_id as the key.
+
+    Returns spreadsheet_id (Google Sheet ID) - this IS the identifier.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Check if sheet exists
+    cursor.execute('SELECT spreadsheet_id FROM sheets WHERE spreadsheet_id = ?', (spreadsheet_id,))
     row = cursor.fetchone()
+
     if row:
-        sheet_id = row['id']
-        # Update spreadsheet_title if provided (in case it was missing before)
+        # Update title if provided
         if spreadsheet_title:
             cursor.execute('''
-                UPDATE sheets SET spreadsheet_title = ? WHERE id = ?
-            ''', (spreadsheet_title, sheet_id))
+                UPDATE sheets SET spreadsheet_title = ?, updated_at = ? WHERE spreadsheet_id = ?
+            ''', (spreadsheet_title, datetime.now().isoformat(), spreadsheet_id))
             conn.commit()
     else:
-        # Create new sheet
+        # Create new sheet entry
         cursor.execute('''
             INSERT INTO sheets (spreadsheet_id, spreadsheet_title, sheet_name, gdud, pluga)
             VALUES (?, ?, ?, ?, ?)
         ''', (spreadsheet_id, spreadsheet_title, sheet_name, gdud, pluga))
-        sheet_id = cursor.lastrowid
         conn.commit()
 
     conn.close()
-    return sheet_id
+    return spreadsheet_id  # Return the Google Sheet ID directly
 
-def get_sheet_by_id(sheet_id):
-    """Get sheet info by ID"""
+def get_sheet_by_id(spreadsheet_id):
+    """Get sheet info by spreadsheet_id (Google Sheet ID)"""
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM sheets WHERE id = ?', (sheet_id,))
+    cursor.execute('SELECT * FROM sheets WHERE spreadsheet_id = ?', (spreadsheet_id,))
     row = cursor.fetchone()
     conn.close()
     if row:
         return dict(row)
     return None
 
-def get_sheet_id_by_google_identifiers(spreadsheet_id, sheet_name, gdud='', pluga=''):
-    """Get internal sheet ID using Google identifiers (spreadsheet_id + sheet_name + gdud + pluga)"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT id FROM sheets
-        WHERE spreadsheet_id = ? AND sheet_name = ? AND gdud = ? AND pluga = ?
-    ''', (spreadsheet_id, sheet_name, gdud, pluga))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return row['id']
-    return None
-
-def update_sheet_dates(sheet_id, start_date, end_date):
+def update_sheet_dates(spreadsheet_id, start_date, end_date):
     """Update date range for a sheet"""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
         UPDATE sheets SET start_date = ?, end_date = ?, updated_at = ?
-        WHERE id = ?
-    ''', (start_date, end_date, datetime.now().isoformat(), sheet_id))
+        WHERE spreadsheet_id = ?
+    ''', (start_date, end_date, datetime.now().isoformat(), spreadsheet_id))
     conn.commit()
     conn.close()
 
-def save_team_members(sheet_id, members):
+def save_team_members(spreadsheet_id, members):
     """Save team members for a sheet (replaces existing)"""
     conn = get_db_connection()
     cursor = conn.cursor()
 
     # Delete existing members for this sheet
-    cursor.execute('DELETE FROM team_members WHERE sheet_id = ?', (sheet_id,))
+    cursor.execute('DELETE FROM team_members WHERE spreadsheet_id = ?', (spreadsheet_id,))
 
     # Insert new members
     for member in members:
         cursor.execute('''
-            INSERT INTO team_members (sheet_id, first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai)
+            INSERT INTO team_members (spreadsheet_id, first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            sheet_id,
+            spreadsheet_id,
             member.get('firstName', ''),
             member.get('lastName', ''),
             member.get('ma', ''),
@@ -283,14 +307,14 @@ def save_team_members(sheet_id, members):
     conn.commit()
     conn.close()
 
-def get_team_members(sheet_id):
+def get_team_members(spreadsheet_id):
     """Get all team members for a sheet"""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
         SELECT first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai
-        FROM team_members WHERE sheet_id = ?
-    ''', (sheet_id,))
+        FROM team_members WHERE spreadsheet_id = ?
+    ''', (spreadsheet_id,))
     rows = cursor.fetchall()
     conn.close()
 
@@ -307,7 +331,7 @@ def get_team_members(sheet_id):
         })
     return members
 
-def update_attendance(sheet_id, ma, date, status):
+def update_attendance(spreadsheet_id, ma, date, status):
     """Update attendance for a specific member and date"""
     # Get timestamp before operation for validation
     before_mtime = get_db_mtime()
@@ -319,9 +343,9 @@ def update_attendance(sheet_id, ma, date, status):
     cursor = conn.cursor()
 
     cursor.execute('''
-        INSERT OR REPLACE INTO attendance (sheet_id, ma, date, status, updated_at)
+        INSERT OR REPLACE INTO attendance (spreadsheet_id, ma, date, status, updated_at)
         VALUES (?, ?, ?, ?, ?)
-    ''', (sheet_id, ma, date, status, datetime.now().isoformat()))
+    ''', (spreadsheet_id, ma, date, status, datetime.now().isoformat()))
 
     conn.commit()
     conn.close()
@@ -329,13 +353,13 @@ def update_attendance(sheet_id, ma, date, status):
     # Validate DB was modified
     validate_db_modified(before_mtime, f"update_attendance(ma={ma}, date={date}, status={status})")
 
-def get_attendance(sheet_id):
+def get_attendance(spreadsheet_id):
     """Get all attendance data for a sheet"""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT ma, date, status FROM attendance WHERE sheet_id = ?
-    ''', (sheet_id,))
+        SELECT ma, date, status FROM attendance WHERE spreadsheet_id = ?
+    ''', (spreadsheet_id,))
     rows = cursor.fetchall()
     conn.close()
 
@@ -354,20 +378,21 @@ def get_all_sheets():
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT id, spreadsheet_id, sheet_name, gdud, pluga, start_date, end_date, created_at
+        SELECT spreadsheet_id, spreadsheet_title, sheet_name, gdud, pluga, start_date, end_date, created_at
         FROM sheets ORDER BY created_at DESC
     ''')
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
 
-def delete_sheet(sheet_id):
+def delete_sheet(spreadsheet_id):
     """Delete a sheet and all its data"""
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM attendance WHERE sheet_id = ?', (sheet_id,))
-    cursor.execute('DELETE FROM team_members WHERE sheet_id = ?', (sheet_id,))
-    cursor.execute('DELETE FROM sheets WHERE id = ?', (sheet_id,))
+    cursor.execute('DELETE FROM attendance WHERE spreadsheet_id = ?', (spreadsheet_id,))
+    cursor.execute('DELETE FROM team_members WHERE spreadsheet_id = ?', (spreadsheet_id,))
+    cursor.execute('DELETE FROM active_users WHERE spreadsheet_id = ?', (spreadsheet_id,))
+    cursor.execute('DELETE FROM sheets WHERE spreadsheet_id = ?', (spreadsheet_id,))
     conn.commit()
     conn.close()
 
@@ -377,32 +402,14 @@ def delete_sheet(sheet_id):
 
 ACTIVE_USER_TIMEOUT_SECONDS = 30  # Consider user inactive after 30 seconds
 
-def ensure_active_users_table():
-    """Ensure the active_users table exists (migration helper)"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS active_users (
-            session_id TEXT PRIMARY KEY,
-            email TEXT DEFAULT 'Anonymous',
-            sheet_id INTEGER NOT NULL,
-            last_seen REAL NOT NULL,
-            FOREIGN KEY (sheet_id) REFERENCES sheets(id) ON DELETE CASCADE
-        )
-    ''')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_active_users_sheet ON active_users(sheet_id)')
-    conn.commit()
-    conn.close()
-    print("active_users table ensured")
-
-def update_active_user(session_id, email, sheet_id, last_seen):
+def update_active_user(session_id, email, spreadsheet_id, last_seen):
     """Update or insert an active user session"""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT OR REPLACE INTO active_users (session_id, email, sheet_id, last_seen)
+        INSERT OR REPLACE INTO active_users (session_id, email, spreadsheet_id, last_seen)
         VALUES (?, ?, ?, ?)
-    ''', (session_id, email, sheet_id, last_seen))
+    ''', (session_id, email, spreadsheet_id, last_seen))
     conn.commit()
     conn.close()
 
@@ -416,7 +423,7 @@ def cleanup_inactive_users():
     conn.commit()
     conn.close()
 
-def get_active_users_for_sheet(sheet_id, exclude_session=None):
+def get_active_users_for_sheet(spreadsheet_id, exclude_session=None):
     """Get list of active user emails for a sheet, optionally excluding a session"""
     cleanup_inactive_users()
     conn = get_db_connection()
@@ -425,30 +432,44 @@ def get_active_users_for_sheet(sheet_id, exclude_session=None):
     if exclude_session:
         cursor.execute('''
             SELECT email FROM active_users
-            WHERE sheet_id = ? AND session_id != ?
-        ''', (sheet_id, exclude_session))
+            WHERE spreadsheet_id = ? AND session_id != ?
+        ''', (spreadsheet_id, exclude_session))
     else:
         cursor.execute('''
-            SELECT email FROM active_users WHERE sheet_id = ?
-        ''', (sheet_id,))
+            SELECT email FROM active_users WHERE spreadsheet_id = ?
+        ''', (spreadsheet_id,))
 
     rows = cursor.fetchall()
     conn.close()
     return [row['email'] for row in rows]
 
-def get_all_active_users_for_sheet(sheet_id):
+def get_all_active_users_for_sheet(spreadsheet_id):
     """Get all active users for a sheet (including current session)"""
     cleanup_inactive_users()
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT email FROM active_users WHERE sheet_id = ?
-    ''', (sheet_id,))
+        SELECT email FROM active_users WHERE spreadsheet_id = ?
+    ''', (spreadsheet_id,))
     rows = cursor.fetchall()
     conn.close()
     return [row['email'] for row in rows]
 
+# ============================================
+# Backwards compatibility functions
+# ============================================
+
+def get_sheet_id_by_google_identifiers(spreadsheet_id, sheet_name='', gdud='', pluga=''):
+    """Get sheet by Google spreadsheet_id - returns spreadsheet_id itself for backwards compatibility"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT spreadsheet_id FROM sheets WHERE spreadsheet_id = ?', (spreadsheet_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return row['spreadsheet_id']
+    return None
+
 # Initialize database when module is imported
 init_database()
-# Ensure active_users table exists (migration for existing databases)
-ensure_active_users_table()
+print("Database initialized with spreadsheet_id as primary key")
