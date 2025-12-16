@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.1.1';  // Disconnect from Google on logout
+const FE_VERSION = '2.2';  // Neon PostgreSQL with connection pooling
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds

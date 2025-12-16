@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '2.0.0'  # PostgreSQL/Supabase persistent database
+BE_VERSION = '2.2'  # Neon PostgreSQL with connection pooling
 
 # NOTE: Active users are now tracked in SQLite database (see database.py)
 # This allows multi-worker deployments (like Gunicorn) to share state
