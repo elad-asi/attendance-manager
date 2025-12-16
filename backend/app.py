@@ -9,7 +9,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-import database as db
+import local_cache as db  # Use local cache with Neon sync
 import cloud_backup
 import email_auth
 
@@ -17,10 +17,9 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '2.4.6'  # Return all rows for local parsing
+BE_VERSION = '2.5.0'  # Local SQLite cache with Neon sync
 
-# NOTE: Active users are now tracked in SQLite database (see database.py)
-# This allows multi-worker deployments (like Gunicorn) to share state
+# NOTE: Using local SQLite for fast reads/writes with periodic Neon sync
 
 # Auto-backup configuration
 AUTO_BACKUP_INTERVAL_SECONDS = 60 * 60  # 1 hour
@@ -476,6 +475,21 @@ def health_check():
 def get_version():
     """Get backend version"""
     return jsonify({'version': BE_VERSION})
+
+@app.route('/api/sync-status', methods=['GET'])
+def get_sync_status():
+    """Get pending sync count for UI indicator"""
+    pending_count = db.get_pending_sync_count()
+    return jsonify({
+        'pendingCount': pending_count,
+        'synced': pending_count == 0
+    })
+
+@app.route('/api/force-sync', methods=['POST'])
+def force_sync():
+    """Force immediate sync to Neon"""
+    db.force_sync_now()
+    return jsonify({'success': True, 'pendingCount': db.get_pending_sync_count()})
 
 @app.route('/api/migrate', methods=['POST', 'GET'])
 def run_migration():

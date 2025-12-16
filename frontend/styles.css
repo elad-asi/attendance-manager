@@ -49,6 +49,32 @@ header {
     text-align: left;
 }
 
+/* Sync status indicator */
+.sync-status {
+    font-size: 1.1rem;
+    margin-top: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.sync-status.synced {
+    color: #2ecc71;
+}
+
+.sync-status.pending {
+    color: #f39c12;
+    animation: pulse 1s infinite;
+}
+
+.sync-status.error {
+    color: #e74c3c;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
 /* User info - in upload section */
 .user-info {
     font-size: 0.85rem;

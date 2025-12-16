@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.4.6';  // Faster setall/clearall + local sheet parsing
+const FE_VERSION = '2.5.0';  // Local cache with Neon sync + sync indicator
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -322,6 +322,9 @@ function initializeAppClean() {
     // Load BE version
     loadBackendVersion();
 
+    // Start sync status polling
+    startSyncStatusPolling();
+
     // Display current date
     updateCurrentDateDisplay();
 
@@ -467,6 +470,9 @@ function initializeApp() {
     // Load BE version
     loadBackendVersion();
 
+    // Start sync status polling
+    startSyncStatusPolling();
+
     // Display current date
     updateCurrentDateDisplay();
 
@@ -538,6 +544,51 @@ async function loadBackendVersion() {
         document.getElementById('beVersion').textContent = `BE: ${data.version}`;
     } catch (error) {
         document.getElementById('beVersion').textContent = 'BE: N/A';
+    }
+}
+
+// ============================================
+// Sync Status Indicator
+// ============================================
+
+let syncStatusInterval = null;
+
+async function updateSyncStatus() {
+    try {
+        const data = await apiGet('/sync-status');
+        const syncEl = document.getElementById('syncStatus');
+        if (!syncEl) return;
+
+        if (data.synced) {
+            syncEl.className = 'sync-status synced';
+            syncEl.title = 'מסונכרן לענן';
+            syncEl.innerHTML = '&#x2601;'; // cloud icon
+        } else {
+            syncEl.className = 'sync-status pending';
+            syncEl.title = `ממתין לסנכרון: ${data.pendingCount} שינויים`;
+            syncEl.innerHTML = `&#x2601; ${data.pendingCount}`;
+        }
+    } catch (error) {
+        const syncEl = document.getElementById('syncStatus');
+        if (syncEl) {
+            syncEl.className = 'sync-status error';
+            syncEl.title = 'שגיאה בבדיקת סנכרון';
+        }
+    }
+}
+
+function startSyncStatusPolling() {
+    // Poll sync status every 2 seconds
+    if (!syncStatusInterval) {
+        syncStatusInterval = setInterval(updateSyncStatus, 2000);
+        updateSyncStatus(); // Initial check
+    }
+}
+
+function stopSyncStatusPolling() {
+    if (syncStatusInterval) {
+        clearInterval(syncStatusInterval);
+        syncStatusInterval = null;
     }
 }
 
