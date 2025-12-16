@@ -920,11 +920,39 @@ header h1 {
     font-weight: 600;
 }
 
-/* Header dorech/yamam styling */
+.col-setall {
+    min-width: 45px;
+    text-align: center;
+}
+
+/* Header dorech/yamam/setall styling */
 thead .col-dorech,
-thead .col-yamam {
+thead .col-yamam,
+thead .col-setall {
     background: #2c3e50 !important;
     color: white;
+}
+
+/* Set All button styling */
+.btn-setall {
+    background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: bold;
+}
+
+.btn-setall:hover {
+    background: linear-gradient(135deg, #219a52 0%, #27ae60 100%);
+    transform: scale(1.1);
+}
+
+.btn-setall:active {
+    transform: scale(0.95);
 }
 
 #attendanceTable tbody tr:nth-child(even) {

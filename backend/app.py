@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '2.2'  # Neon PostgreSQL with connection pooling
+BE_VERSION = '2.4'  # Added "Set All" button per row
 
 # NOTE: Active users are now tracked in SQLite database (see database.py)
 # This allows multi-worker deployments (like Gunicorn) to share state
@@ -63,13 +63,10 @@ def get_all_sheets():
 
 @app.route('/api/sheets/<spreadsheet_id>', methods=['GET'])
 def get_sheet(spreadsheet_id):
-    """Get a specific sheet with all its data"""
-    sheet = db.get_sheet_by_id(spreadsheet_id)
+    """Get a specific sheet with all its data - optimized single connection"""
+    sheet, team_members, attendance_data = db.get_full_sheet_data(spreadsheet_id)
     if not sheet:
         return jsonify({'error': 'Sheet not found'}), 404
-
-    team_members = db.get_team_members(spreadsheet_id)
-    attendance_data = db.get_attendance(spreadsheet_id)
 
     return jsonify({
         'sheet': sheet,
@@ -194,13 +191,10 @@ def set_sheet_date_range(spreadsheet_id):
 
 @app.route('/api/sheets/<spreadsheet_id>/export', methods=['GET'])
 def export_sheet_data(spreadsheet_id):
-    """Export all data for a sheet"""
-    sheet = db.get_sheet_by_id(spreadsheet_id)
+    """Export all data for a sheet - optimized single connection"""
+    sheet, team_members, attendance_data = db.get_full_sheet_data(spreadsheet_id)
     if not sheet:
         return jsonify({'error': 'Sheet not found'}), 404
-
-    team_members = db.get_team_members(spreadsheet_id)
-    attendance_data = db.get_attendance(spreadsheet_id)
 
     return jsonify({
         'sheet': sheet,
@@ -657,12 +651,9 @@ def heartbeat(spreadsheet_id):
     # Check if data version changed (backup was restored) - force full reload
     if client_data_version and client_data_version != current_data_version:
         print(f"[SYNC] Data version mismatch: client={client_data_version}, server={current_data_version} - forcing full reload")
-        sheet = db.get_sheet_by_id(spreadsheet_id)
+        sheet, team_members, attendance_data = db.get_full_sheet_data(spreadsheet_id)
         if not sheet:
             return jsonify({'error': 'Sheet not found'}), 404
-
-        team_members = db.get_team_members(spreadsheet_id)
-        attendance_data = db.get_attendance(spreadsheet_id)
 
         return jsonify({
             'success': True,
@@ -689,13 +680,10 @@ def heartbeat(spreadsheet_id):
             'activeUsers': other_users
         })
     else:
-        # First sync - return full data
-        sheet = db.get_sheet_by_id(spreadsheet_id)
+        # First sync - return full data (optimized single connection)
+        sheet, team_members, attendance_data = db.get_full_sheet_data(spreadsheet_id)
         if not sheet:
             return jsonify({'error': 'Sheet not found'}), 404
-
-        team_members = db.get_team_members(spreadsheet_id)
-        attendance_data = db.get_attendance(spreadsheet_id)
 
         return jsonify({
             'success': True,

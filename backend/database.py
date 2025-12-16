@@ -318,6 +318,55 @@ def get_attendance(spreadsheet_id):
 
     return attendance_data
 
+def get_full_sheet_data(spreadsheet_id):
+    """Get sheet, team members, and attendance in ONE connection - much faster!"""
+    conn = get_db_connection()
+    cursor = get_dict_cursor(conn)
+
+    # Get sheet info
+    cursor.execute('SELECT * FROM sheets WHERE spreadsheet_id = %s', (spreadsheet_id,))
+    sheet_row = cursor.fetchone()
+    sheet = dict(sheet_row) if sheet_row else None
+
+    if not sheet:
+        conn.close()
+        return None, [], {}
+
+    # Get team members
+    cursor.execute('''
+        SELECT first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai
+        FROM team_members WHERE spreadsheet_id = %s
+    ''', (spreadsheet_id,))
+    member_rows = cursor.fetchall()
+
+    members = []
+    for row in member_rows:
+        members.append({
+            'firstName': row['first_name'],
+            'lastName': row['last_name'],
+            'ma': row['ma'],
+            'gdud': row['gdud'],
+            'pluga': row['pluga'],
+            'mahlaka': row['mahlaka'],
+            'miktzoaTzvai': row.get('miktzoa_tzvai', '')
+        })
+
+    # Get attendance
+    cursor.execute('''
+        SELECT ma, date, status FROM attendance WHERE spreadsheet_id = %s
+    ''', (spreadsheet_id,))
+    attendance_rows = cursor.fetchall()
+
+    attendance_data = {}
+    for row in attendance_rows:
+        ma = row['ma']
+        if ma not in attendance_data:
+            attendance_data[ma] = {}
+        attendance_data[ma][row['date']] = row['status']
+
+    conn.close()
+    return sheet, members, attendance_data
+
 def get_attendance_changes_since(spreadsheet_id, since_timestamp, exclude_session_id=''):
     """Get attendance changes since a timestamp, optionally excluding changes by a specific session"""
     conn = get_db_connection()

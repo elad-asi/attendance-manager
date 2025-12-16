@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.2';  // Neon PostgreSQL with connection pooling
+const FE_VERSION = '2.4';  // Added "Set All" button per row
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -1826,6 +1826,8 @@ function renderTable() {
     colPositions.dorech = rightPos;
     rightPos += 50;
     colPositions.yamam = rightPos;
+    rightPos += 50;
+    colPositions.setall = rightPos;
 
     // Clear existing content - columns vary based on skipped preferences
     headerRow.innerHTML = `
@@ -1839,6 +1841,7 @@ function renderTable() {
         ${showMiktzoaTzvai ? `<th class="sticky-col col-miktzoa" style="right: ${colPositions.miktzoa}px">${STRINGS.miktzoaTzvai}</th>` : ''}
         <th class="sticky-col col-dorech" style="right: ${colPositions.dorech}px">${STRINGS.dorech}</th>
         <th class="sticky-col col-yamam" style="right: ${colPositions.yamam}px">${STRINGS.yamam}</th>
+        <th class="sticky-col col-setall" style="right: ${colPositions.setall}px">מלא</th>
     `;
     tbody.innerHTML = '';
 
@@ -1891,7 +1894,14 @@ function renderTable() {
             ${showMiktzoaTzvai ? `<td class="sticky-col col-miktzoa" style="right: ${colPositions.miktzoa}px">${member.miktzoaTzvai || ''}</td>` : ''}
             <td class="sticky-col col-dorech member-dorech" style="right: ${colPositions.dorech}px" data-ma="${member.ma}">${memberDorech}</td>
             <td class="sticky-col col-yamam member-yamam" style="right: ${colPositions.yamam}px" data-ma="${member.ma}">${memberYamam}</td>
+            <td class="sticky-col col-setall" style="right: ${colPositions.setall}px"><button class="btn-setall" data-ma="${member.ma}" title="מלא הכל">▶</button></td>
         `;
+
+        // Add click handler for Set All button
+        const setAllBtn = row.querySelector('.btn-setall');
+        if (setAllBtn) {
+            setAllBtn.addEventListener('click', () => setAllForMember(member.ma));
+        }
 
         dates.forEach(date => {
             const dateStr = formatDate(date);
@@ -1931,8 +1941,8 @@ function renderTotalRows(tbody, dates, filteredMembers) {
 
     const membersToCount = filteredMembers || teamMembers;
 
-    // Calculate colspan based on skipped columns (base 10 minus skipped)
-    let colspanCount = 10;
+    // Calculate colspan based on skipped columns (base 11 minus skipped - includes setall column)
+    let colspanCount = 11;
     if (skippedColumns.includes('mahlaka')) colspanCount--;
     if (skippedColumns.includes('miktzoaTzvai')) colspanCount--;
 
@@ -2073,6 +2083,53 @@ async function cycleStatus(cell, ma, date) {
 
     // Update יממ summary
     renderUnitSelector();
+}
+
+// Set all dates for a member: first day = arriving (+), rest = present (✓)
+async function setAllForMember(ma) {
+    if (!ma || ma.startsWith('TEMP_')) {
+        alert('לא ניתן לעדכן נוכחות - חסר מספר אישי (מ.א)');
+        return;
+    }
+
+    const dates = generateDateRange();
+    if (dates.length === 0) return;
+
+    // Initialize attendance data for this member if needed
+    if (!attendanceData[ma]) {
+        attendanceData[ma] = {};
+    }
+
+    // Process each date
+    for (let i = 0; i < dates.length; i++) {
+        const dateStr = formatDate(dates[i]);
+        const status = (i === 0) ? 'arriving' : 'present';  // First day = +, rest = ✓
+
+        // Update local state
+        attendanceData[ma][dateStr] = status;
+
+        // Update UI cell
+        const cell = document.querySelector(`.attendance-cell[data-ma="${ma}"][data-date="${dateStr}"]`);
+        if (cell) {
+            cell.className = `attendance-cell ${status}${isPastDate(dateStr) ? ' past-date' : ''}${isWeekend(dates[i]) ? ' weekend-cell' : ''}`;
+            cell.textContent = STATUS_LABELS[status];
+            cell.dataset.tooltip = STATUS_TOOLTIPS[status];
+        }
+
+        // Save to backend
+        await saveAttendanceToBackend(ma, dateStr, status);
+
+        // Update totals for this date
+        updateTotals(dateStr);
+    }
+
+    // Update member's totals
+    updateMemberTotals(ma);
+
+    // Update יממ summary
+    renderUnitSelector();
+
+    showSaveToast('כל התאריכים עודכנו');
 }
 
 function updateTotals(dateStr) {
