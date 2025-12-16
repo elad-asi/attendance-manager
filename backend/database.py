@@ -298,6 +298,35 @@ def update_attendance(spreadsheet_id, ma, date, status, session_id=''):
     conn.commit()
     conn.close()
 
+def update_attendance_batch(spreadsheet_id, updates, session_id=''):
+    """Update multiple attendance records in a single transaction"""
+    if not updates:
+        return
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    timestamp = datetime.now().isoformat()
+
+    # Use executemany for batch insert/update
+    from psycopg.sql import SQL
+
+    # Prepare data for batch insert
+    values = [(spreadsheet_id, u['ma'], u['date'], u['status'], timestamp, session_id) for u in updates]
+
+    # PostgreSQL batch upsert using executemany
+    cursor.executemany('''
+        INSERT INTO attendance (spreadsheet_id, ma, date, status, updated_at, updated_by_session)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        ON CONFLICT (spreadsheet_id, ma, date)
+        DO UPDATE SET status = EXCLUDED.status, updated_at = EXCLUDED.updated_at, updated_by_session = EXCLUDED.updated_by_session
+    ''', values)
+
+    print(f"[SYNC DEBUG] Batch saved {len(updates)} attendance records, session={session_id[:8] if session_id else 'none'}...")
+
+    conn.commit()
+    conn.close()
+
 def get_attendance(spreadsheet_id):
     """Get all attendance data for a sheet"""
     conn = get_db_connection()

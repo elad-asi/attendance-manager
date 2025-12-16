@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '2.4'  # Added "Set All" button per row
+BE_VERSION = '2.4.3'  # Batch attendance updates
 
 # NOTE: Active users are now tracked in SQLite database (see database.py)
 # This allows multi-worker deployments (like Gunicorn) to share state
@@ -156,6 +156,19 @@ def update_sheet_attendance(spreadsheet_id):
         return jsonify({'error': 'Missing ma, date, or status'}), 400
 
     db.update_attendance(spreadsheet_id, ma, date, status, session_id)
+    return jsonify({'success': True, 'serverTimestamp': db.get_server_timestamp()})
+
+@app.route('/api/sheets/<spreadsheet_id>/attendance/batch', methods=['POST'])
+def update_sheet_attendance_batch(spreadsheet_id):
+    """Update multiple attendance records in a single request"""
+    req = request.json
+    updates = req.get('updates', [])
+    session_id = req.get('sessionId', '')
+
+    if not updates:
+        return jsonify({'error': 'No updates provided'}), 400
+
+    db.update_attendance_batch(spreadsheet_id, updates, session_id)
     return jsonify({'success': True, 'serverTimestamp': db.get_server_timestamp()})
 
 # ============================================

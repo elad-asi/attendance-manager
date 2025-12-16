@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.4.2';  // Set All / Clear All toggle button
+const FE_VERSION = '2.4.3';  // Batch attendance updates
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -2253,7 +2253,7 @@ async function clearAllForMember(ma) {
     }
 }
 
-// Save multiple attendance records in parallel
+// Save multiple attendance records in a single batch request
 async function saveAttendanceBatch(updates) {
     if (!currentSpreadsheetId) {
         console.error('No spreadsheet ID set - data not saved to server');
@@ -2265,22 +2265,14 @@ async function saveAttendanceBatch(updates) {
     isSaving = true;
 
     try {
-        // Send all updates in parallel
-        const promises = updates.map(update =>
-            apiPost(`/sheets/${currentSpreadsheetId}/attendance`, {
-                ma: update.ma,
-                date: update.date,
-                status: update.status,
-                sessionId: SESSION_ID
-            })
-        );
+        // Send all updates in a single batch request
+        const result = await apiPost(`/sheets/${currentSpreadsheetId}/attendance/batch`, {
+            updates: updates,
+            sessionId: SESSION_ID
+        });
 
-        const results = await Promise.all(promises);
-
-        // Update lastSyncTimestamp from last result
-        const lastResult = results[results.length - 1];
-        if (lastResult && lastResult.serverTimestamp) {
-            lastSyncTimestamp = lastResult.serverTimestamp;
+        if (result && result.serverTimestamp) {
+            lastSyncTimestamp = result.serverTimestamp;
         }
     } catch (error) {
         console.error('Error saving attendance batch:', error);
