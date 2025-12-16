@@ -1,6 +1,6 @@
 import os
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import psycopg
+from psycopg.rows import dict_row
 from datetime import datetime
 
 # Database connection URL from environment variable
@@ -12,13 +12,13 @@ BACKUP_DIR = os.path.join(SCRIPT_DIR, 'data', 'backups')
 MAX_BACKUPS = 10
 
 def get_db_connection():
-    """Get a database connection with dict cursor"""
-    conn = psycopg2.connect(DATABASE_URL)
+    """Get a database connection"""
+    conn = psycopg.connect(DATABASE_URL)
     return conn
 
 def get_dict_cursor(conn):
     """Get a cursor that returns dicts"""
-    return conn.cursor(cursor_factory=RealDictCursor)
+    return conn.cursor(row_factory=dict_row)
 
 # These functions are no longer applicable for PostgreSQL but kept for compatibility
 def get_db_mtime():
