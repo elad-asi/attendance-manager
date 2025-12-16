@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.4';  // Added "Set All" button per row
+const FE_VERSION = '2.4.2';  // Set All / Clear All toggle button
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -1894,13 +1894,13 @@ function renderTable() {
             ${showMiktzoaTzvai ? `<td class="sticky-col col-miktzoa" style="right: ${colPositions.miktzoa}px">${member.miktzoaTzvai || ''}</td>` : ''}
             <td class="sticky-col col-dorech member-dorech" style="right: ${colPositions.dorech}px" data-ma="${member.ma}">${memberDorech}</td>
             <td class="sticky-col col-yamam member-yamam" style="right: ${colPositions.yamam}px" data-ma="${member.ma}">${memberYamam}</td>
-            <td class="sticky-col col-setall" style="right: ${colPositions.setall}px"><button class="btn-setall" data-ma="${member.ma}" title="מלא הכל">▶</button></td>
+            <td class="sticky-col col-setall" style="right: ${colPositions.setall}px"><button class="btn-setall ${isRowFilled(member.ma) ? 'clear-mode' : ''}" data-ma="${member.ma}" title="${isRowFilled(member.ma) ? 'נקה הכל' : 'מלא הכל'}">${isRowFilled(member.ma) ? '✕' : '▶'}</button></td>
         `;
 
-        // Add click handler for Set All button
+        // Add click handler for Set All / Clear All toggle button
         const setAllBtn = row.querySelector('.btn-setall');
         if (setAllBtn) {
-            setAllBtn.addEventListener('click', () => setAllForMember(member.ma));
+            setAllBtn.addEventListener('click', () => toggleRowForMember(member.ma));
         }
 
         dates.forEach(date => {
@@ -2085,6 +2085,30 @@ async function cycleStatus(cell, ma, date) {
     renderUnitSelector();
 }
 
+// Check if row is filled (has any non-unmarked status)
+function isRowFilled(ma) {
+    const dates = generateDateRange();
+    if (!attendanceData[ma]) return false;
+
+    for (const date of dates) {
+        const dateStr = formatDate(date);
+        const status = attendanceData[ma][dateStr];
+        if (status && status !== 'unmarked') {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Toggle between set all and clear all for a member
+async function toggleRowForMember(ma) {
+    if (isRowFilled(ma)) {
+        await clearAllForMember(ma);
+    } else {
+        await setAllForMember(ma);
+    }
+}
+
 // Set all dates for a member: first day = arriving (+), rest = present (✓)
 async function setAllForMember(ma) {
     if (!ma || ma.startsWith('TEMP_')) {
@@ -2095,41 +2119,177 @@ async function setAllForMember(ma) {
     const dates = generateDateRange();
     if (dates.length === 0) return;
 
-    // Initialize attendance data for this member if needed
-    if (!attendanceData[ma]) {
-        attendanceData[ma] = {};
+    // Show busy cursor
+    document.body.style.cursor = 'wait';
+    const btn = document.querySelector(`.btn-setall[data-ma="${ma}"]`);
+    if (btn) {
+        btn.disabled = true;
+        btn.style.cursor = 'wait';
+        btn.textContent = '⏳';
     }
 
-    // Process each date
-    for (let i = 0; i < dates.length; i++) {
-        const dateStr = formatDate(dates[i]);
-        const status = (i === 0) ? 'arriving' : 'present';  // First day = +, rest = ✓
-
-        // Update local state
-        attendanceData[ma][dateStr] = status;
-
-        // Update UI cell
-        const cell = document.querySelector(`.attendance-cell[data-ma="${ma}"][data-date="${dateStr}"]`);
-        if (cell) {
-            cell.className = `attendance-cell ${status}${isPastDate(dateStr) ? ' past-date' : ''}${isWeekend(dates[i]) ? ' weekend-cell' : ''}`;
-            cell.textContent = STATUS_LABELS[status];
-            cell.dataset.tooltip = STATUS_TOOLTIPS[status];
+    try {
+        // Initialize attendance data for this member if needed
+        if (!attendanceData[ma]) {
+            attendanceData[ma] = {};
         }
 
-        // Save to backend
-        await saveAttendanceToBackend(ma, dateStr, status);
+        // First: Update all UI cells immediately
+        const updates = [];
+        for (let i = 0; i < dates.length; i++) {
+            const dateStr = formatDate(dates[i]);
+            const status = (i === 0) ? 'arriving' : 'present';  // First day = +, rest = ✓
 
-        // Update totals for this date
-        updateTotals(dateStr);
+            // Update local state
+            attendanceData[ma][dateStr] = status;
+
+            // Update UI cell
+            const cell = document.querySelector(`.attendance-cell[data-ma="${ma}"][data-date="${dateStr}"]`);
+            if (cell) {
+                cell.className = `attendance-cell ${status}${isPastDate(dateStr) ? ' past-date' : ''}${isWeekend(dates[i]) ? ' weekend-cell' : ''}`;
+                cell.textContent = STATUS_LABELS[status];
+                cell.dataset.tooltip = STATUS_TOOLTIPS[status];
+            }
+
+            // Update totals for this date
+            updateTotals(dateStr);
+
+            // Collect updates for batch save
+            updates.push({ ma, date: dateStr, status });
+        }
+
+        // Update member's totals immediately
+        updateMemberTotals(ma);
+
+        // Update יממ summary immediately
+        renderUnitSelector();
+
+        // Then: Save all to backend in parallel
+        await saveAttendanceBatch(updates);
+
+        showSaveToast('כל התאריכים עודכנו');
+    } finally {
+        // Restore cursor and update button to show clear mode
+        document.body.style.cursor = '';
+        if (btn) {
+            btn.disabled = false;
+            btn.style.cursor = '';
+            btn.textContent = '✕';
+            btn.title = 'נקה הכל';
+            btn.classList.add('clear-mode');
+        }
+    }
+}
+
+// Clear all dates for a member (set to unmarked)
+async function clearAllForMember(ma) {
+    if (!ma || ma.startsWith('TEMP_')) {
+        alert('לא ניתן לעדכן נוכחות - חסר מספר אישי (מ.א)');
+        return;
     }
 
-    // Update member's totals
-    updateMemberTotals(ma);
+    const dates = generateDateRange();
+    if (dates.length === 0) return;
 
-    // Update יממ summary
-    renderUnitSelector();
+    // Show busy cursor
+    document.body.style.cursor = 'wait';
+    const btn = document.querySelector(`.btn-setall[data-ma="${ma}"]`);
+    if (btn) {
+        btn.disabled = true;
+        btn.style.cursor = 'wait';
+        btn.textContent = '⏳';
+    }
 
-    showSaveToast('כל התאריכים עודכנו');
+    try {
+        // Initialize attendance data for this member if needed
+        if (!attendanceData[ma]) {
+            attendanceData[ma] = {};
+        }
+
+        // First: Update all UI cells immediately
+        const updates = [];
+        for (let i = 0; i < dates.length; i++) {
+            const dateStr = formatDate(dates[i]);
+            const status = 'unmarked';
+
+            // Update local state
+            attendanceData[ma][dateStr] = status;
+
+            // Update UI cell
+            const cell = document.querySelector(`.attendance-cell[data-ma="${ma}"][data-date="${dateStr}"]`);
+            if (cell) {
+                cell.className = `attendance-cell ${status}${isPastDate(dateStr) ? ' past-date' : ''}${isWeekend(dates[i]) ? ' weekend-cell' : ''}`;
+                cell.textContent = STATUS_LABELS[status];
+                cell.dataset.tooltip = STATUS_TOOLTIPS[status];
+            }
+
+            // Update totals for this date
+            updateTotals(dateStr);
+
+            // Collect updates for batch save
+            updates.push({ ma, date: dateStr, status });
+        }
+
+        // Update member's totals immediately
+        updateMemberTotals(ma);
+
+        // Update יממ summary immediately
+        renderUnitSelector();
+
+        // Then: Save all to backend in parallel
+        await saveAttendanceBatch(updates);
+
+        showSaveToast('כל התאריכים נוקו');
+    } finally {
+        // Restore cursor and update button to show fill mode
+        document.body.style.cursor = '';
+        if (btn) {
+            btn.disabled = false;
+            btn.style.cursor = '';
+            btn.textContent = '▶';
+            btn.title = 'מלא הכל';
+            btn.classList.remove('clear-mode');
+        }
+    }
+}
+
+// Save multiple attendance records in parallel
+async function saveAttendanceBatch(updates) {
+    if (!currentSpreadsheetId) {
+        console.error('No spreadsheet ID set - data not saved to server');
+        showSaveToast('לא מחובר לשרת', true);
+        return;
+    }
+
+    // Set saving flag to prevent poll from overwriting
+    isSaving = true;
+
+    try {
+        // Send all updates in parallel
+        const promises = updates.map(update =>
+            apiPost(`/sheets/${currentSpreadsheetId}/attendance`, {
+                ma: update.ma,
+                date: update.date,
+                status: update.status,
+                sessionId: SESSION_ID
+            })
+        );
+
+        const results = await Promise.all(promises);
+
+        // Update lastSyncTimestamp from last result
+        const lastResult = results[results.length - 1];
+        if (lastResult && lastResult.serverTimestamp) {
+            lastSyncTimestamp = lastResult.serverTimestamp;
+        }
+    } catch (error) {
+        console.error('Error saving attendance batch:', error);
+        showSaveToast('שגיאה בשמירה', true);
+    } finally {
+        setTimeout(() => {
+            isSaving = false;
+        }, 500);
+    }
 }
 
 function updateTotals(dateStr) {
