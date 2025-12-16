@@ -20,15 +20,21 @@ from datetime import datetime
 from contextlib import contextmanager
 
 # Configuration
-SYNC_INTERVAL_SECONDS = 10  # Sync to Neon every 10 seconds
+SYNC_INTERVAL_SECONDS = 3  # Sync to Neon every 3 seconds
 LOCAL_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'local_cache.db')
 DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://neondb_owner:npg_0h1CnwkqOjfi@ep-summer-rain-agc7n25e-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require')
 
 # Track pending changes for sync
 _pending_attendance = []  # List of (spreadsheet_id, ma, date, status, timestamp, session_id)
+_pending_sheets = []  # List of (spreadsheet_id, spreadsheet_title, sheet_name, gdud, pluga)
+_pending_team_members = {}  # Dict of spreadsheet_id -> list of members
 _pending_lock = threading.Lock()
 _sync_thread = None
 _sync_running = False
+
+# Persistent Neon connection for sync thread (avoids 0.4s connection overhead per sync)
+_neon_sync_conn = None
+_neon_conn_lock = threading.Lock()
 
 # ============================================
 # Local SQLite Connection
@@ -61,8 +67,17 @@ def local_db():
 # ============================================
 
 def get_neon_connection():
-    """Get a connection to Neon PostgreSQL"""
+    """Get a new connection to Neon PostgreSQL"""
     return psycopg.connect(DATABASE_URL)
+
+def get_neon_sync_connection():
+    """Get or reuse persistent connection for sync thread (much faster)"""
+    global _neon_sync_conn
+    with _neon_conn_lock:
+        if _neon_sync_conn is None or _neon_sync_conn.closed:
+            print("[SYNC] Creating persistent Neon connection...")
+            _neon_sync_conn = psycopg.connect(DATABASE_URL)
+        return _neon_sync_conn
 
 def get_neon_dict_cursor(conn):
     """Get a cursor that returns dicts"""
@@ -229,38 +244,83 @@ def pull_from_neon():
 # ============================================
 
 def push_pending_to_neon():
-    """Push pending attendance changes to Neon"""
-    global _pending_attendance
+    """Push all pending changes to Neon using persistent connection"""
+    global _pending_attendance, _pending_sheets, _pending_team_members, _neon_sync_conn
 
+    # Get all pending items
     with _pending_lock:
-        if not _pending_attendance:
-            return
-        pending = _pending_attendance.copy()
+        pending_attendance = _pending_attendance.copy()
         _pending_attendance = []
+        pending_sheets = _pending_sheets.copy()
+        _pending_sheets = []
+        pending_team_members = dict(_pending_team_members)
+        _pending_team_members = {}
 
-    if not pending:
+    if not pending_attendance and not pending_sheets and not pending_team_members:
         return
 
     try:
-        conn = get_neon_connection()
+        # Use persistent connection (avoids 0.4s connection overhead)
+        conn = get_neon_sync_connection()
         cursor = conn.cursor()
 
-        # Batch upsert
-        cursor.executemany('''
-            INSERT INTO attendance (spreadsheet_id, ma, date, status, updated_at, updated_by_session)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            ON CONFLICT (spreadsheet_id, ma, date)
-            DO UPDATE SET status = EXCLUDED.status, updated_at = EXCLUDED.updated_at, updated_by_session = EXCLUDED.updated_by_session
-        ''', pending)
+        # Sync sheets first
+        if pending_sheets:
+            for sheet_data in pending_sheets:
+                cursor.execute('''
+                    INSERT INTO sheets (spreadsheet_id, spreadsheet_title, sheet_name, gdud, pluga)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (spreadsheet_id) DO UPDATE SET
+                        spreadsheet_title = EXCLUDED.spreadsheet_title,
+                        updated_at = CURRENT_TIMESTAMP
+                ''', sheet_data)
+            print(f"[SYNC] Pushed {len(pending_sheets)} sheets to Neon")
+
+        # Sync team members
+        if pending_team_members:
+            for spreadsheet_id, members in pending_team_members.items():
+                cursor.execute('DELETE FROM team_members WHERE spreadsheet_id = %s', (spreadsheet_id,))
+                for member in members:
+                    cursor.execute('''
+                        INSERT INTO team_members (spreadsheet_id, first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ''', (
+                        spreadsheet_id,
+                        member.get('firstName', ''), member.get('lastName', ''), member.get('ma', ''),
+                        member.get('gdud', ''), member.get('pluga', ''),
+                        member.get('mahlaka', ''), member.get('miktzoaTzvai', '')
+                    ))
+            print(f"[SYNC] Pushed team members for {len(pending_team_members)} sheets to Neon")
+
+        # Sync attendance
+        if pending_attendance:
+            cursor.executemany('''
+                INSERT INTO attendance (spreadsheet_id, ma, date, status, updated_at, updated_by_session)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (spreadsheet_id, ma, date)
+                DO UPDATE SET status = EXCLUDED.status, updated_at = EXCLUDED.updated_at, updated_by_session = EXCLUDED.updated_by_session
+            ''', pending_attendance)
+            print(f"[SYNC] Pushed {len(pending_attendance)} attendance records to Neon")
 
         conn.commit()
-        conn.close()
-        print(f"[SYNC] Pushed {len(pending)} attendance records to Neon")
+        # Don't close - keep connection open for reuse
     except Exception as e:
         print(f"[SYNC ERROR] Failed to push to Neon: {e}")
+        # Reset connection on error so it gets recreated
+        with _neon_conn_lock:
+            if _neon_sync_conn:
+                try:
+                    _neon_sync_conn.close()
+                except:
+                    pass
+                _neon_sync_conn = None
         # Re-add failed items to pending queue
         with _pending_lock:
-            _pending_attendance = pending + _pending_attendance
+            _pending_attendance = pending_attendance + _pending_attendance
+            _pending_sheets = pending_sheets + _pending_sheets
+            for sid, members in pending_team_members.items():
+                if sid not in _pending_team_members:
+                    _pending_team_members[sid] = members
 
 def _sync_loop():
     """Background sync loop"""
@@ -281,10 +341,18 @@ def start_sync_thread():
 
 def stop_sync_thread():
     """Stop the background sync thread"""
-    global _sync_running
+    global _sync_running, _neon_sync_conn
     _sync_running = False
     # Push any remaining changes
     push_pending_to_neon()
+    # Close persistent connection
+    with _neon_conn_lock:
+        if _neon_sync_conn:
+            try:
+                _neon_sync_conn.close()
+            except:
+                pass
+            _neon_sync_conn = None
 
 # ============================================
 # Database API (uses local cache)
@@ -333,7 +401,7 @@ def get_server_timestamp():
     return datetime.now().isoformat()
 
 def get_or_create_sheet(spreadsheet_id, sheet_name='', gdud='', pluga='', spreadsheet_title=''):
-    """Get or create sheet in local cache"""
+    """Get or create sheet in local cache (Neon sync happens in background)"""
     with local_db() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT spreadsheet_id FROM sheets WHERE spreadsheet_id = ?', (spreadsheet_id,))
@@ -349,21 +417,9 @@ def get_or_create_sheet(spreadsheet_id, sheet_name='', gdud='', pluga='', spread
                 VALUES (?, ?, ?, ?, ?)
             ''', (spreadsheet_id, spreadsheet_title, sheet_name, gdud, pluga))
 
-    # Sync to Neon (async would be better but keep it simple)
-    try:
-        neon_conn = get_neon_connection()
-        neon_cursor = neon_conn.cursor()
-        neon_cursor.execute('''
-            INSERT INTO sheets (spreadsheet_id, spreadsheet_title, sheet_name, gdud, pluga)
-            VALUES (%s, %s, %s, %s, %s)
-            ON CONFLICT (spreadsheet_id) DO UPDATE SET
-                spreadsheet_title = EXCLUDED.spreadsheet_title,
-                updated_at = CURRENT_TIMESTAMP
-        ''', (spreadsheet_id, spreadsheet_title, sheet_name, gdud, pluga))
-        neon_conn.commit()
-        neon_conn.close()
-    except Exception as e:
-        print(f"get_or_create_sheet Neon sync error: {e}")
+    # Queue for background Neon sync (no blocking!)
+    with _pending_lock:
+        _pending_sheets.append((spreadsheet_id, spreadsheet_title, sheet_name, gdud, pluga))
 
     return spreadsheet_id
 
@@ -407,7 +463,7 @@ def update_sheet_dates(spreadsheet_id, start_date, end_date):
         print(f"update_sheet_dates Neon sync error: {e}")
 
 def save_team_members(spreadsheet_id, members):
-    """Save team members to local cache"""
+    """Save team members to local cache (Neon sync happens in background)"""
     with local_db() as conn:
         cursor = conn.cursor()
         cursor.execute('DELETE FROM team_members WHERE spreadsheet_id = ?', (spreadsheet_id,))
@@ -422,25 +478,9 @@ def save_team_members(spreadsheet_id, members):
                 member.get('mahlaka', ''), member.get('miktzoaTzvai', '')
             ))
 
-    # Sync to Neon
-    try:
-        neon_conn = get_neon_connection()
-        neon_cursor = neon_conn.cursor()
-        neon_cursor.execute('DELETE FROM team_members WHERE spreadsheet_id = %s', (spreadsheet_id,))
-        for member in members:
-            neon_cursor.execute('''
-                INSERT INTO team_members (spreadsheet_id, first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            ''', (
-                spreadsheet_id,
-                member.get('firstName', ''), member.get('lastName', ''), member.get('ma', ''),
-                member.get('gdud', ''), member.get('pluga', ''),
-                member.get('mahlaka', ''), member.get('miktzoaTzvai', '')
-            ))
-        neon_conn.commit()
-        neon_conn.close()
-    except Exception as e:
-        print(f"save_team_members Neon sync error: {e}")
+    # Queue for background Neon sync (no blocking!)
+    with _pending_lock:
+        _pending_team_members[spreadsheet_id] = members
 
 def get_team_members(spreadsheet_id):
     """Get team members from local cache"""
@@ -683,9 +723,12 @@ def check_spreadsheet_exists(spreadsheet_id):
 # ============================================
 
 def get_pending_sync_count():
-    """Get the number of pending attendance changes waiting to sync to Neon"""
+    """Get the total number of pending changes waiting to sync to Neon"""
     with _pending_lock:
-        return len(_pending_attendance)
+        count = len(_pending_attendance)
+        count += len(_pending_sheets)
+        count += sum(len(members) for members in _pending_team_members.values())
+        return count
 
 def force_sync_now():
     """Force an immediate sync to Neon"""
