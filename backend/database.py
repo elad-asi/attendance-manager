@@ -3,8 +3,8 @@ import psycopg
 from psycopg.rows import dict_row
 from datetime import datetime
 
-# Database connection URL from environment variable
-DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://postgres:Asi1Mic0@db.ykzjmngikwutzqlmzxzv.supabase.co:5432/postgres')
+# Database connection URL from environment variable (Neon PostgreSQL)
+DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://neondb_owner:npg_0h1CnwkqOjfi@ep-summer-rain-agc7n25e-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require')
 
 # For backwards compatibility with backup functions
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
