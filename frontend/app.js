@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.4.3';  // Batch attendance updates
+const FE_VERSION = '2.4.4';  // Faster UI (fire-and-forget saves)
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -306,23 +306,20 @@ async function validateExistingSession() {
     }
 }
 
-async function logout() {
-    try {
-        await fetch(`${API_BASE}/auth/logout`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionToken: authSessionToken })
-        });
-    } catch (error) {
-        console.error('Logout error:', error);
-    }
+function logout() {
+    // Fire-and-forget: notify backend (don't wait)
+    fetch(`${API_BASE}/auth/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionToken: authSessionToken })
+    }).catch(error => console.error('Logout error:', error));
 
     clearAuthSession();
 
-    // Also disconnect from Google
+    // Also disconnect from Google (fire-and-forget)
     handleGoogleSignOut();
 
-    // Show login screen
+    // Show login screen immediately
     document.getElementById('loginOverlay').classList.remove('hidden');
     document.getElementById('loggedInUserDisplay').style.display = 'none';
 
@@ -1022,12 +1019,18 @@ function handleGoogleSignIn() {
 }
 
 function handleGoogleSignOut() {
+    const tokenToRevoke = accessToken;
     accessToken = null;
     localStorage.removeItem('google_access_token');
     localStorage.removeItem('google_user_info');
 
-    if (google.accounts.oauth2) {
-        google.accounts.oauth2.revoke(accessToken);
+    // Fire-and-forget: revoke Google token (don't wait)
+    if (tokenToRevoke && google.accounts && google.accounts.oauth2) {
+        try {
+            google.accounts.oauth2.revoke(tokenToRevoke);
+        } catch (e) {
+            console.error('Google revoke error:', e);
+        }
     }
 
     updateAuthUI(false);
@@ -2323,7 +2326,7 @@ function updateMemberTotals(ma) {
 // Date Range Functions
 // ============================================
 
-async function applyDateRange() {
+function applyDateRange() {
     const newStartDate = document.getElementById('startDate').value;
     const newEndDate = document.getElementById('endDate').value;
 
@@ -2335,15 +2338,16 @@ async function applyDateRange() {
     startDate = new Date(newStartDate);
     endDate = new Date(newEndDate);
 
-    // Save to backend (sheet-specific if we have a spreadsheet ID)
+    // Render table immediately
+    renderTable();
+
+    // Save to backend in background (fire-and-forget)
     if (currentSpreadsheetId) {
-        await apiPost(`/sheets/${currentSpreadsheetId}/date-range`, {
+        apiPost(`/sheets/${currentSpreadsheetId}/date-range`, {
             startDate: newStartDate,
             endDate: newEndDate
-        });
+        }).catch(error => console.error('Error saving date range:', error));
     }
-
-    renderTable();
 }
 
 // ============================================
