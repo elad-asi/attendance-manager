@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.4.4';  // Faster UI (fire-and-forget saves)
+const FE_VERSION = '2.4.5';  // Clean state on login - user must load sheet
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -273,8 +273,95 @@ function onLoginSuccess() {
     // Set currentUserEmail for heartbeat
     currentUserEmail = authUserEmail;
 
-    // Initialize the app
-    initializeApp();
+    // Clear any previous data - user must load a sheet explicitly
+    clearSheetData();
+
+    // Initialize the app (without loading data)
+    initializeAppClean();
+}
+
+function clearSheetData() {
+    // Clear local data
+    teamMembers = [];
+    attendanceData = {};
+    currentSpreadsheetId = null;
+    currentSheetName = null;
+    currentSpreadsheetTitle = null;
+
+    // Clear localStorage sheet references
+    localStorage.removeItem('current_spreadsheet_id');
+    localStorage.removeItem('current_sheet_info');
+
+    // Stop polling if running
+    if (pollIntervalId) {
+        clearInterval(pollIntervalId);
+        pollIntervalId = null;
+    }
+
+    // Hide sheet info bar
+    document.getElementById('sheetInfoDisplay').style.display = 'none';
+
+    // Hide unit selector
+    document.getElementById('unitSelectorSection').style.display = 'none';
+
+    // Reset Google Sheets UI
+    document.getElementById('sheetsUrl').value = '';
+    document.getElementById('sheetSelectRow').style.display = 'none';
+    document.getElementById('gdudPlugaRow').style.display = 'none';
+    document.getElementById('loadFromSheets').style.display = 'none';
+    document.getElementById('sheetsStatus').textContent = '';
+
+    // Render empty table
+    renderTable();
+}
+
+function initializeAppClean() {
+    // Set FE version
+    document.getElementById('feVersion').textContent = `FE: ${FE_VERSION}`;
+
+    // Load BE version
+    loadBackendVersion();
+
+    // Display current date
+    updateCurrentDateDisplay();
+
+    // Initialize Google Auth
+    initializeGoogleAuth();
+
+    // DO NOT load from backend - user must load sheet explicitly
+
+    // Google Connect/Disconnect button
+    document.getElementById('googleConnectBtn').addEventListener('click', handleGoogleConnectClick);
+
+    // Google Sheets buttons
+    document.getElementById('fetchSheetsBtn').addEventListener('click', fetchSheetsList);
+    document.getElementById('sheetSelect').addEventListener('change', handleSheetSelect);
+    document.getElementById('loadFromSheets').addEventListener('click', loadFromGoogleSheets);
+
+    // Enable fetch button when URL is entered and user is signed in
+    document.getElementById('sheetsUrl').addEventListener('input', function() {
+        document.getElementById('fetchSheetsBtn').disabled = !accessToken || !this.value.trim();
+    });
+
+    // Update load button state when gdud/pluga change
+    document.getElementById('inputGdud').addEventListener('input', updateLoadButtonState);
+    document.getElementById('inputPluga').addEventListener('input', updateLoadButtonState);
+
+    // Date range
+    document.getElementById('applyDates').addEventListener('click', applyDateRange);
+
+    // Export
+    document.getElementById('exportData').addEventListener('click', exportData);
+
+    // Column mapping modal buttons
+    document.getElementById('confirmMappingBtn').addEventListener('click', confirmColumnMapping);
+    document.getElementById('cancelMappingBtn').addEventListener('click', hideColumnMappingModal);
+
+    // Toggle column visibility
+    document.getElementById('toggleMiktzoa').addEventListener('click', toggleMiktzoaColumn);
+
+    // Render empty table with "no data" message
+    renderTable();
 }
 
 async function validateExistingSession() {
