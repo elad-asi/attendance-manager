@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '2.5.0'  # Local SQLite cache with Neon sync
+BE_VERSION = '2.5.1'  # Fix local cache initialization
 
 # NOTE: Using local SQLite for fast reads/writes with periodic Neon sync
 

@@ -41,6 +41,11 @@ def get_local_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+# Alias for backwards compatibility with app.py
+def get_db_connection():
+    """Alias for get_local_connection - for backwards compatibility"""
+    return get_local_connection()
+
 @contextmanager
 def local_db():
     """Context manager for local SQLite connection"""
@@ -727,3 +732,6 @@ def get_db_mtime():
 
 def validate_db_modified(before_mtime, operation_name):
     return True
+
+# Initialize on module import (like old database.py)
+initialize()
