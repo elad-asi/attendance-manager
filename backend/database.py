@@ -1,7 +1,6 @@
 import os
 import psycopg
 from psycopg.rows import dict_row
-from psycopg_pool import ConnectionPool
 from datetime import datetime
 
 # Database connection URL from environment variable (Neon PostgreSQL)
@@ -12,23 +11,10 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BACKUP_DIR = os.path.join(SCRIPT_DIR, 'data', 'backups')
 MAX_BACKUPS = 10
 
-# Connection pool for better performance
-_pool = None
-
-def get_pool():
-    """Get or create the connection pool"""
-    global _pool
-    if _pool is None:
-        _pool = ConnectionPool(DATABASE_URL, min_size=1, max_size=10, open=True)
-    return _pool
-
+# Simple connection function - no pooling for now (Neon has its own pooler)
 def get_db_connection():
-    """Get a database connection from the pool"""
-    return get_pool().getconn()
-
-def release_connection(conn):
-    """Return a connection to the pool"""
-    get_pool().putconn(conn)
+    """Get a database connection"""
+    return psycopg.connect(DATABASE_URL)
 
 def get_dict_cursor(conn):
     """Get a cursor that returns dicts"""
