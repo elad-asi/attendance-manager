@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '1.1.1';  // Better restore warning message
+const FE_VERSION = '2.0.0';  // PostgreSQL/Supabase persistent database
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
