@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '2.4.5'  # Clean state on login
+BE_VERSION = '2.4.6'  # Return all rows for local parsing
 
 # NOTE: Active users are now tracked in SQLite database (see database.py)
 # This allows multi-worker deployments (like Gunicorn) to share state
@@ -350,7 +350,7 @@ def get_sheet_data():
             'headers': headers,
             'headerMap': header_map,
             'sampleValues': sample_values,
-            'rawRows': rows[:3]  # Return first 3 rows for preview
+            'allRows': rows  # Return ALL rows for frontend parsing
         })
 
     except HttpError as e:

@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.4.5';  // Clean state on login - user must load sheet
+const FE_VERSION = '2.4.6';  // Faster setall/clearall + local sheet parsing
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -1275,6 +1275,43 @@ async function loadFromGoogleSheets() {
     }
 }
 
+// Parse rows locally using user's column mapping (avoids second API call to Google)
+function parseRowsWithMapping(rows, columnMapping, gdud, pluga) {
+    const members = [];
+
+    for (const row of rows) {
+        if (!row || row.length === 0) continue;
+
+        function getValue(field) {
+            const idx = columnMapping[field];
+            if (idx === 'skip' || idx === undefined || idx === null) return '';
+            if (row.length > idx) {
+                const val = row[idx];
+                if (val === '?' || (val && val.trim() === '?')) return '';
+                return val || '';
+            }
+            return '';
+        }
+
+        const member = {
+            firstName: getValue('firstName'),
+            lastName: getValue('lastName'),
+            ma: getValue('ma'),
+            mahlaka: columnMapping.mahlaka === 'skip' ? '' : getValue('mahlaka'),
+            miktzoaTzvai: columnMapping.miktzoaTzvai === 'skip' ? '' : getValue('miktzoaTzvai'),
+            gdud: gdud,
+            pluga: pluga
+        };
+
+        // Only add if we have at least a name or ma
+        if (member.firstName || member.lastName || member.ma) {
+            members.push(member);
+        }
+    }
+
+    return members;
+}
+
 function showColumnMappingModal(headers, autoMapping, sampleValues) {
     const modal = document.getElementById('columnMappingModal');
     const grid = document.getElementById('mappingGrid');
@@ -1405,29 +1442,8 @@ async function confirmColumnMapping() {
     showSheetsStatus('מעבד נתונים...', 'loading');
 
     try {
-        // Re-parse members using the user's custom column mapping
-        // We need to fetch all rows from backend with custom mapping
-        const parseResponse = await apiPost('/sheets/parse-with-mapping', {
-            accessToken: accessToken,
-            spreadsheetId: currentSpreadsheetId,
-            sheetName: sheetName,
-            columnMapping: currentColumnMapping
-        });
-
-        if (parseResponse.error) {
-            throw new Error(parseResponse.error);
-        }
-
-        // Add gdud and pluga to all members
-        const mappedMembers = parseResponse.members.map(m => ({
-            firstName: m.firstName || '',
-            lastName: m.lastName || '',
-            ma: m.ma || '',
-            mahlaka: currentColumnMapping.mahlaka === 'skip' ? '' : (m.mahlaka || ''),
-            miktzoaTzvai: currentColumnMapping.miktzoaTzvai === 'skip' ? '' : (m.miktzoaTzvai || ''),
-            gdud: gdud,
-            pluga: pluga
-        }));
+        // Parse members locally using the user's column mapping (no extra API call!)
+        const mappedMembers = parseRowsWithMapping(response.allRows, currentColumnMapping, gdud, pluga);
 
         // Load or create sheet in database and save members
         const loadResponse = await apiPost('/sheets/load', {
@@ -2241,20 +2257,20 @@ async function setAllForMember(ma) {
                 cell.dataset.tooltip = STATUS_TOOLTIPS[status];
             }
 
-            // Update totals for this date
-            updateTotals(dateStr);
-
             // Collect updates for batch save
             updates.push({ ma, date: dateStr, status });
         }
 
-        // Update member's totals immediately
+        // Update ALL totals once (not per date - much faster!)
+        updateAllTotals();
+
+        // Update member's totals
         updateMemberTotals(ma);
 
-        // Update יממ summary immediately
+        // Update יממ summary
         renderUnitSelector();
 
-        // Then: Save all to backend in parallel
+        // Save all to backend in single batch request
         await saveAttendanceBatch(updates);
 
         showSaveToast('כל התאריכים עודכנו');
@@ -2313,20 +2329,20 @@ async function clearAllForMember(ma) {
                 cell.dataset.tooltip = STATUS_TOOLTIPS[status];
             }
 
-            // Update totals for this date
-            updateTotals(dateStr);
-
             // Collect updates for batch save
             updates.push({ ma, date: dateStr, status });
         }
 
-        // Update member's totals immediately
+        // Update ALL totals once (not per date - much faster!)
+        updateAllTotals();
+
+        // Update member's totals
         updateMemberTotals(ma);
 
-        // Update יממ summary immediately
+        // Update יממ summary
         renderUnitSelector();
 
-        // Then: Save all to backend in parallel
+        // Save all to backend in single batch request
         await saveAttendanceBatch(updates);
 
         showSaveToast('כל התאריכים נוקו');
@@ -2392,6 +2408,28 @@ function updateTotals(dateStr) {
             const count = calculateTotal(dateStr, totalsConfig[rowIndex].statusList);
             cells[dateIndex].textContent = count;
         }
+    });
+}
+
+// Update all totals at once (more efficient than calling updateTotals per date)
+function updateAllTotals() {
+    const dates = generateDateRange();
+    const totalRows = document.querySelectorAll('.total-row');
+    const totalsConfig = [
+        { key: 'mission', statusList: TOTALS_CONFIG.mission },
+        { key: 'includeLeave', statusList: TOTALS_CONFIG.includeLeave },
+        { key: 'counted', statusList: TOTALS_CONFIG.counted }
+    ];
+
+    totalRows.forEach((row, rowIndex) => {
+        const cells = row.querySelectorAll('.total-cell');
+        dates.forEach((date, dateIndex) => {
+            if (cells[dateIndex]) {
+                const dateStr = formatDate(date);
+                const count = calculateTotal(dateStr, totalsConfig[rowIndex].statusList);
+                cells[dateIndex].textContent = count;
+            }
+        });
     });
 }
 
