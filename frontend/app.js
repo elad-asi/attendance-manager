@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.1.0';  // Remove backup feature (Neon handles backups)
+const FE_VERSION = '2.1.1';  // Disconnect from Google on logout
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -318,6 +318,9 @@ async function logout() {
     }
 
     clearAuthSession();
+
+    // Also disconnect from Google
+    handleGoogleSignOut();
 
     // Show login screen
     document.getElementById('loginOverlay').classList.remove('hidden');
