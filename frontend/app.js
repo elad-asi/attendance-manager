@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.5.5';  // Add search filters for name and MA
+const FE_VERSION = '2.5.6';  // Validate Google token on login
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -1081,20 +1081,46 @@ function initializeGoogleAuth() {
         callback: handleAuthCallback
     });
 
-    // Check for stored token
+    // Check for stored token - validate it's still valid
     const storedToken = localStorage.getItem('google_access_token');
     if (storedToken) {
-        accessToken = storedToken;
-        updateAuthUI(true);
-        document.getElementById('fetchSheetsBtn').disabled = false;
+        // Validate token before using it
+        validateGoogleToken(storedToken);
+    }
+}
 
-        // Restore user info display from localStorage
-        const storedUserInfo = localStorage.getItem('google_user_info');
-        if (storedUserInfo) {
-            const userInfo = JSON.parse(storedUserInfo);
-            currentUserEmail = userInfo.email || null;
+async function validateGoogleToken(token) {
+    try {
+        const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+            // Token is valid - restore connection
+            accessToken = token;
+            updateAuthUI(true);
+            document.getElementById('fetchSheetsBtn').disabled = false;
+
+            const userInfo = await response.json();
+            localStorage.setItem('google_user_info', JSON.stringify(userInfo));
             updateUserDisplay(userInfo);
+            console.log('[Google Auth] Token validated successfully');
+        } else {
+            // Token is invalid/expired - clear it
+            console.log('[Google Auth] Stored token invalid (status ' + response.status + ') - clearing');
+            localStorage.removeItem('google_access_token');
+            localStorage.removeItem('google_user_info');
+            accessToken = null;
+            updateAuthUI(false);
         }
+    } catch (error) {
+        console.error('[Google Auth] Token validation error:', error);
+        // Network error - keep token but don't mark as connected
+        // User can try to reconnect manually
+        localStorage.removeItem('google_access_token');
+        localStorage.removeItem('google_user_info');
+        accessToken = null;
+        updateAuthUI(false);
     }
 }
 
