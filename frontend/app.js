@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.5.6';  // Validate Google token on login
+const FE_VERSION = '2.5.7';  // Search filters in column headers
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -322,39 +322,6 @@ function clearSheetData() {
     renderTable();
 }
 
-// Initialize search filter event listeners
-let searchDebounceTimer = null;
-function initializeSearchFilters() {
-    const searchFirstName = document.getElementById('searchFirstName');
-    const searchLastName = document.getElementById('searchLastName');
-    const searchMa = document.getElementById('searchMa');
-    const clearSearchBtn = document.getElementById('clearSearch');
-
-    const debounceSearch = () => {
-        clearTimeout(searchDebounceTimer);
-        searchDebounceTimer = setTimeout(() => {
-            searchFilters.firstName = searchFirstName.value.trim();
-            searchFilters.lastName = searchLastName.value.trim();
-            searchFilters.ma = searchMa.value.trim();
-            renderTable();
-        }, 200);
-    };
-
-    searchFirstName.addEventListener('input', debounceSearch);
-    searchLastName.addEventListener('input', debounceSearch);
-    searchMa.addEventListener('input', debounceSearch);
-
-    clearSearchBtn.addEventListener('click', () => {
-        searchFirstName.value = '';
-        searchLastName.value = '';
-        searchMa.value = '';
-        searchFilters.firstName = '';
-        searchFilters.lastName = '';
-        searchFilters.ma = '';
-        renderTable();
-    });
-}
-
 function initializeAppClean() {
     // Set FE version
     document.getElementById('feVersion').textContent = `FE: ${FE_VERSION}`;
@@ -392,9 +359,6 @@ function initializeAppClean() {
 
     // Date range
     document.getElementById('applyDates').addEventListener('click', applyDateRange);
-
-    // Search filters (with debounce for better performance)
-    initializeSearchFilters();
 
     // Export
     document.getElementById('exportData').addEventListener('click', exportData);
@@ -544,9 +508,6 @@ function initializeApp() {
 
     // Date range
     document.getElementById('applyDates').addEventListener('click', applyDateRange);
-
-    // Search filters (with debounce for better performance)
-    initializeSearchFilters();
 
     // Export
     document.getElementById('exportData').addEventListener('click', exportData);
@@ -1998,6 +1959,28 @@ function createSortableHeader(field, label, isSticky = true, colClass = '', righ
     </th>`;
 }
 
+// Create searchable header with input in the column header itself
+function createSearchableHeader(field, label, searchField, placeholder, isSticky = true, colClass = '', rightPosition = null) {
+    const isSorted = sortConfig.field === field;
+    const sortIndicator = isSorted ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : '';
+    const stickyClass = isSticky ? 'sticky-col' : '';
+    const activeClass = isSorted ? 'sort-active' : '';
+    const styleAttr = rightPosition !== null ? `style="right: ${rightPosition}px"` : '';
+    const currentValue = searchFilters[searchField] || '';
+
+    return `<th class="${stickyClass} ${colClass} searchable-header ${activeClass}" ${styleAttr}>
+        <div class="header-with-search">
+            <span class="header-label" onclick="handleSort('${field}')">${label}${sortIndicator}</span>
+            <input type="text"
+                   class="header-search-input"
+                   data-search-field="${searchField}"
+                   placeholder="${placeholder}"
+                   value="${currentValue}"
+                   onclick="event.stopPropagation()" />
+        </div>
+    </th>`;
+}
+
 // Handle sort click
 function handleSort(field) {
     if (sortConfig.field === field) {
@@ -2075,9 +2058,9 @@ function renderTable() {
     // Clear existing content - columns vary based on skipped preferences
     headerRow.innerHTML = `
         <th class="sticky-col col-index" style="right: ${colPositions.index}px">${STRINGS.index}</th>
-        ${createSortableHeader('firstName', STRINGS.firstName, true, 'col-firstname', colPositions.firstname)}
-        ${createSortableHeader('lastName', STRINGS.lastName, true, 'col-lastname', colPositions.lastname)}
-        ${createSortableHeader('ma', STRINGS.misparIshi, true, 'col-ma', colPositions.ma)}
+        ${createSearchableHeader('firstName', STRINGS.firstName, 'firstName', 'חיפוש...', true, 'col-firstname', colPositions.firstname)}
+        ${createSearchableHeader('lastName', STRINGS.lastName, 'lastName', 'חיפוש...', true, 'col-lastname', colPositions.lastname)}
+        ${createSearchableHeader('ma', STRINGS.misparIshi, 'ma', 'חיפוש...', true, 'col-ma', colPositions.ma)}
         <th class="sticky-col col-gdud" style="right: ${colPositions.gdud}px">${gdudFilter}</th>
         <th class="sticky-col col-pluga" style="right: ${colPositions.pluga}px">${plugaFilter}</th>
         ${showMahlaka ? `<th class="sticky-col col-mahlaka" style="right: ${colPositions.mahlaka}px">${mahlakaFilter}</th>` : ''}
@@ -2172,6 +2155,40 @@ function renderTable() {
 
     // Update unit selector (includes יממ summary)
     renderUnitSelector();
+
+    // Attach event listeners to header search inputs
+    attachHeaderSearchListeners();
+}
+
+// Attach event listeners for header search inputs (with debounce)
+let headerSearchTimeout = null;
+function attachHeaderSearchListeners() {
+    document.querySelectorAll('.header-search-input').forEach(input => {
+        input.addEventListener('input', function() {
+            const field = this.dataset.searchField;
+            const value = this.value.trim();
+
+            // Clear previous timeout
+            if (headerSearchTimeout) {
+                clearTimeout(headerSearchTimeout);
+            }
+
+            // Debounce the search
+            headerSearchTimeout = setTimeout(() => {
+                searchFilters[field] = value;
+                renderTable();
+            }, 200);
+        });
+
+        // Clear on Escape key
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                this.value = '';
+                searchFilters[this.dataset.searchField] = '';
+                renderTable();
+            }
+        });
+    });
 }
 
 function renderTotalRows(tbody, dates, filteredMembers) {
