@@ -1264,10 +1264,8 @@ thead .col-setall {
 }
 
 #totalsTable {
-    width: 100%;
     border-collapse: separate;
     border-spacing: 0;
-    min-width: 800px;
     table-layout: fixed;
 }
 
@@ -1275,6 +1273,7 @@ thead .col-setall {
     padding: 10px 8px;
     text-align: center;
     border: 1px solid #e9ecef;
+    box-sizing: border-box;
 }
 
 /* Totals Rows */

@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.5.11';  // Separate totals table always visible at bottom
+const FE_VERSION = '2.5.12';  // Align totals columns with main table columns
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -2164,15 +2164,52 @@ function renderTable() {
     attachHeaderSearchListeners();
 }
 
-// Sync horizontal scroll between main table and totals table
+// Sync horizontal scroll and column widths between main table and totals table
 function syncTotalsScroll() {
     const mainContainer = document.getElementById('mainTableContainer');
     const totalsContainer = document.getElementById('totalsContainer');
+    const mainTable = document.getElementById('attendanceTable');
+    const totalsTable = document.getElementById('totalsTable');
 
-    // Remove previous listener to avoid duplicates
+    // Sync scroll position
     mainContainer.onscroll = function() {
         totalsContainer.scrollLeft = mainContainer.scrollLeft;
     };
+
+    // Sync table width to match main table exactly
+    totalsTable.style.width = mainTable.offsetWidth + 'px';
+
+    // Copy column widths from main table header to totals table
+    const headerCells = mainTable.querySelectorAll('thead th');
+    const totalRows = totalsTable.querySelectorAll('tbody tr');
+
+    if (totalRows.length > 0 && headerCells.length > 0) {
+        // Get the first total row to set colgroup
+        const firstRow = totalRows[0];
+        const labelCell = firstRow.querySelector('.total-label');
+
+        if (labelCell) {
+            // Calculate total width of label columns (colspan columns)
+            let labelWidth = 0;
+            const colspan = parseInt(labelCell.getAttribute('colspan')) || 1;
+            for (let i = 0; i < colspan && i < headerCells.length; i++) {
+                labelWidth += headerCells[i].offsetWidth;
+            }
+            labelCell.style.width = labelWidth + 'px';
+            labelCell.style.minWidth = labelWidth + 'px';
+
+            // Set widths for date cells
+            const dateCells = firstRow.querySelectorAll('.total-cell');
+            dateCells.forEach((cell, index) => {
+                const headerIndex = colspan + index;
+                if (headerIndex < headerCells.length) {
+                    const width = headerCells[headerIndex].offsetWidth;
+                    cell.style.width = width + 'px';
+                    cell.style.minWidth = width + 'px';
+                }
+            });
+        }
+    }
 }
 
 // Attach event listeners for header search inputs (with debounce)
