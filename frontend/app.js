@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.5.2';  // Fast Neon sync with persistent connection
+const FE_VERSION = '2.5.3';  // Fix gunicorn sync thread
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
