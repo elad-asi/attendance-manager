@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.5.4';  // Lazy init for gunicorn compatibility
+const FE_VERSION = '2.5.5';  // Add search filters for name and MA
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -43,6 +43,13 @@ let filters = {
     gdud: [],
     pluga: [],
     mahlaka: []
+};
+
+// Search filters (text-based)
+let searchFilters = {
+    firstName: '',
+    lastName: '',
+    ma: ''
 };
 
 // Current active unit tabs (multi-select: empty array = all units)
@@ -315,6 +322,39 @@ function clearSheetData() {
     renderTable();
 }
 
+// Initialize search filter event listeners
+let searchDebounceTimer = null;
+function initializeSearchFilters() {
+    const searchFirstName = document.getElementById('searchFirstName');
+    const searchLastName = document.getElementById('searchLastName');
+    const searchMa = document.getElementById('searchMa');
+    const clearSearchBtn = document.getElementById('clearSearch');
+
+    const debounceSearch = () => {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => {
+            searchFilters.firstName = searchFirstName.value.trim();
+            searchFilters.lastName = searchLastName.value.trim();
+            searchFilters.ma = searchMa.value.trim();
+            renderTable();
+        }, 200);
+    };
+
+    searchFirstName.addEventListener('input', debounceSearch);
+    searchLastName.addEventListener('input', debounceSearch);
+    searchMa.addEventListener('input', debounceSearch);
+
+    clearSearchBtn.addEventListener('click', () => {
+        searchFirstName.value = '';
+        searchLastName.value = '';
+        searchMa.value = '';
+        searchFilters.firstName = '';
+        searchFilters.lastName = '';
+        searchFilters.ma = '';
+        renderTable();
+    });
+}
+
 function initializeAppClean() {
     // Set FE version
     document.getElementById('feVersion').textContent = `FE: ${FE_VERSION}`;
@@ -352,6 +392,9 @@ function initializeAppClean() {
 
     // Date range
     document.getElementById('applyDates').addEventListener('click', applyDateRange);
+
+    // Search filters (with debounce for better performance)
+    initializeSearchFilters();
 
     // Export
     document.getElementById('exportData').addEventListener('click', exportData);
@@ -501,6 +544,9 @@ function initializeApp() {
 
     // Date range
     document.getElementById('applyDates').addEventListener('click', applyDateRange);
+
+    // Search filters (with debounce for better performance)
+    initializeSearchFilters();
 
     // Export
     document.getElementById('exportData').addEventListener('click', exportData);
@@ -1791,6 +1837,20 @@ function getUniqueValues(field, includeEmpty = true) {
 
 function getFilteredMembers() {
     return teamMembers.filter(member => {
+        // Check search filters (text-based, case-insensitive, partial match)
+        if (searchFilters.firstName) {
+            const memberValue = (member.firstName || '').toLowerCase();
+            if (!memberValue.includes(searchFilters.firstName.toLowerCase())) return false;
+        }
+        if (searchFilters.lastName) {
+            const memberValue = (member.lastName || '').toLowerCase();
+            if (!memberValue.includes(searchFilters.lastName.toLowerCase())) return false;
+        }
+        if (searchFilters.ma) {
+            const memberValue = (member.ma || '').toString().toLowerCase();
+            if (!memberValue.includes(searchFilters.ma.toLowerCase())) return false;
+        }
+
         // Check gdud filter (multi-select)
         if (filters.gdud.length > 0) {
             const memberValue = member.gdud || '';

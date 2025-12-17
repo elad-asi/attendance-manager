@@ -607,6 +607,53 @@ header h1 {
     background: #5a6fd6;
 }
 
+.search-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.search-input {
+    padding: 8px 12px;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    width: 140px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.search-input:not(:placeholder-shown) {
+    border-color: #667eea;
+    background-color: #f8f9ff;
+}
+
+.btn-clear-search {
+    background: #dc3545;
+    color: white;
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.btn-clear-search:hover {
+    background: #c82333;
+    transform: scale(1.1);
+}
+
 .actions {
     display: flex;
     gap: 10px;

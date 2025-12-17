@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '2.5.4'  # Lazy init for gunicorn compatibility
+BE_VERSION = '2.5.5'  # Add search filters for name and MA
 
 # NOTE: Using local SQLite for fast reads/writes with periodic Neon sync
 
