@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.5.8';  // Fix export - add SheetJS library
+const FE_VERSION = '2.5.9';  // Sticky total rows at bottom when scrolling
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -2150,8 +2150,9 @@ function renderTable() {
         tbody.appendChild(row);
     });
 
-    // Add total rows (with unit-filtered members)
-    renderTotalRows(tbody, dates, unitFilteredMembers);
+    // Add total rows to tfoot (with unit-filtered members)
+    const tfoot = document.getElementById('attendanceTfoot');
+    renderTotalRows(tfoot, dates, unitFilteredMembers);
 
     // Update unit selector (includes יממ summary)
     renderUnitSelector();
@@ -2191,7 +2192,10 @@ function attachHeaderSearchListeners() {
     });
 }
 
-function renderTotalRows(tbody, dates, filteredMembers) {
+function renderTotalRows(tfoot, dates, filteredMembers) {
+    // Clear existing total rows
+    tfoot.innerHTML = '';
+
     // Using HTML for colored symbols: green ✓ for present, red ✓ for counted
     const totals = [
         { key: 'mission', label: STRINGS.totalMission, symbols: '(<span class="symbol-present">✓</span> +)', class: 'total-mission' },
@@ -2222,7 +2226,7 @@ function renderTotalRows(tbody, dates, filteredMembers) {
             row.appendChild(cell);
         });
 
-        tbody.appendChild(row);
+        tfoot.appendChild(row);
     });
 }
 
