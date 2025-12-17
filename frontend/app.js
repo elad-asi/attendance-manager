@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.5.7';  // Search filters in column headers
+const FE_VERSION = '2.5.8';  // Fix export - add SheetJS library
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
