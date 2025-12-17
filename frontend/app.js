@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.5.10';  // Fix sticky total rows
+const FE_VERSION = '2.5.11';  // Separate totals table always visible at bottom
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -2150,15 +2150,29 @@ function renderTable() {
         tbody.appendChild(row);
     });
 
-    // Add total rows to tfoot (with unit-filtered members)
-    const tfoot = document.getElementById('attendanceTfoot');
-    renderTotalRows(tfoot, dates, unitFilteredMembers);
+    // Add total rows to separate totals table (with unit-filtered members)
+    const totalsTbody = document.getElementById('totalsTbody');
+    renderTotalRows(totalsTbody, dates, unitFilteredMembers);
+
+    // Sync horizontal scroll between main table and totals table
+    syncTotalsScroll();
 
     // Update unit selector (includes יממ summary)
     renderUnitSelector();
 
     // Attach event listeners to header search inputs
     attachHeaderSearchListeners();
+}
+
+// Sync horizontal scroll between main table and totals table
+function syncTotalsScroll() {
+    const mainContainer = document.getElementById('mainTableContainer');
+    const totalsContainer = document.getElementById('totalsContainer');
+
+    // Remove previous listener to avoid duplicates
+    mainContainer.onscroll = function() {
+        totalsContainer.scrollLeft = mainContainer.scrollLeft;
+    };
 }
 
 // Attach event listeners for header search inputs (with debounce)
@@ -2192,9 +2206,9 @@ function attachHeaderSearchListeners() {
     });
 }
 
-function renderTotalRows(tfoot, dates, filteredMembers) {
+function renderTotalRows(totalsTbody, dates, filteredMembers) {
     // Clear existing total rows
-    tfoot.innerHTML = '';
+    totalsTbody.innerHTML = '';
 
     // Using HTML for colored symbols: green ✓ for present, red ✓ for counted
     const totals = [
@@ -2226,7 +2240,7 @@ function renderTotalRows(tfoot, dates, filteredMembers) {
             row.appendChild(cell);
         });
 
-        tfoot.appendChild(row);
+        totalsTbody.appendChild(row);
     });
 }
 

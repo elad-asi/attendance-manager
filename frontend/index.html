@@ -149,7 +149,7 @@
                     <span class="total-value" id="totalYamamValue">0</span>
                 </div>
             </div>
-            <div class="table-container">
+            <div class="table-container" id="mainTableContainer">
                 <table id="attendanceTable">
                     <thead>
                         <tr id="headerRow">
@@ -170,9 +170,14 @@
                     <tbody id="attendanceBody">
                         <!-- Rows will be added dynamically -->
                     </tbody>
-                    <tfoot id="attendanceTfoot">
+                </table>
+            </div>
+            <!-- Sticky totals container - stays visible at bottom -->
+            <div class="totals-container" id="totalsContainer">
+                <table id="totalsTable">
+                    <tbody id="totalsTbody">
                         <!-- Total rows will be added dynamically -->
-                    </tfoot>
+                    </tbody>
                 </table>
             </div>
             <p id="noDataMsg" class="no-data">עדיין לא נוספו חברי צוות. טען מ-Google Sheets.</p>

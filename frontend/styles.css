@@ -857,9 +857,10 @@ header h1 {
 .table-container {
     overflow-x: auto;
     overflow-y: auto;
-    max-height: calc(100vh - 450px);
+    max-height: calc(100vh - 550px);
     border: 1px solid #e9ecef;
-    border-radius: 12px;
+    border-radius: 12px 12px 0 0;
+    border-bottom: none;
     /* Always show scrollbars */
     scrollbar-width: auto;
     scrollbar-color: #667eea #f1f1f1;
@@ -1253,23 +1254,27 @@ thead .col-setall {
     background: #fef6e8 !important;
 }
 
-/* Sticky footer for totals - each row needs sticky positioning */
-#attendanceTfoot .total-row {
-    position: sticky;
-    z-index: 5;
+/* Separate totals container - always visible at bottom */
+.totals-container {
+    overflow-x: hidden;
+    border: 1px solid #e9ecef;
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    background: white;
 }
 
-/* Stack the 3 total rows at the bottom with calculated positions */
-#attendanceTfoot .total-row:nth-child(1) {
-    bottom: 76px; /* 2 rows below × 38px each */
+#totalsTable {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 800px;
+    table-layout: fixed;
 }
 
-#attendanceTfoot .total-row:nth-child(2) {
-    bottom: 38px; /* 1 row below × 38px */
-}
-
-#attendanceTfoot .total-row:nth-child(3) {
-    bottom: 0;
+#totalsTable td {
+    padding: 10px 8px;
+    text-align: center;
+    border: 1px solid #e9ecef;
 }
 
 /* Totals Rows */
