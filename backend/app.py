@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '2.5.3'  # Fix gunicorn sync thread
+BE_VERSION = '2.5.4'  # Lazy init for gunicorn compatibility
 
 # NOTE: Using local SQLite for fast reads/writes with periodic Neon sync
 

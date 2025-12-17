@@ -36,6 +36,10 @@ _sync_running = False
 _neon_sync_conn = None
 _neon_conn_lock = threading.Lock()
 
+# Initialization state (lazy init for gunicorn compatibility)
+_initialized = False
+_init_lock = threading.Lock()
+
 # ============================================
 # Local SQLite Connection
 # ============================================
@@ -567,6 +571,7 @@ def get_attendance(spreadsheet_id):
 
 def get_full_sheet_data(spreadsheet_id):
     """Get full sheet data from local cache - very fast!"""
+    ensure_initialized()  # Lazy init for gunicorn
     with local_db() as conn:
         cursor = conn.cursor()
 
@@ -724,6 +729,7 @@ def check_spreadsheet_exists(spreadsheet_id):
 
 def get_pending_sync_count():
     """Get the total number of pending changes waiting to sync to Neon"""
+    ensure_initialized()  # Lazy init for gunicorn
     with _pending_lock:
         count = len(_pending_attendance)
         count += len(_pending_sheets)
@@ -732,23 +738,36 @@ def get_pending_sync_count():
 
 def force_sync_now():
     """Force an immediate sync to Neon"""
+    ensure_initialized()  # Lazy init for gunicorn
     push_pending_to_neon()
 
 # ============================================
 # Startup
 # ============================================
 
+def ensure_initialized():
+    """Lazy initialization - call this before any operation.
+    This is needed for gunicorn compatibility where threads don't survive fork."""
+    global _initialized
+    if _initialized:
+        return
+    with _init_lock:
+        if _initialized:
+            return
+        init_local_cache()
+        pull_from_neon()
+        start_sync_thread()
+        _initialized = True
+        print("[LOCAL CACHE] Initialized with Neon sync (lazy)")
+
 def initialize():
     """Initialize local cache and start sync"""
-    init_local_cache()
-    pull_from_neon()
-    start_sync_thread()
-    print("[LOCAL CACHE] Initialized with Neon sync")
+    ensure_initialized()
 
 # Backwards compatibility stubs
 def init_database():
     """Backwards compatibility - calls initialize()"""
-    initialize()
+    ensure_initialized()
 
 def migrate_old_data():
     """Not needed"""
@@ -776,5 +795,5 @@ def get_db_mtime():
 def validate_db_modified(before_mtime, operation_name):
     return True
 
-# Initialize on module import (like old database.py)
-initialize()
+# DON'T initialize on import - use lazy init for gunicorn compatibility
+# The first API call will trigger initialization
