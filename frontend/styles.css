@@ -860,24 +860,34 @@ header h1 {
     flex-direction: column;
     border: 1px solid #e9ecef;
     border-radius: 12px;
+    max-height: calc(100vh - 450px);
     overflow: hidden;
 }
 
 .table-container {
     overflow-x: auto;
     overflow-y: auto;
-    max-height: calc(100vh - 550px);
+    flex: 1 1 auto;
+    min-height: 0; /* Important for flex child to shrink */
     /* Always show scrollbars */
     scrollbar-width: auto;
     scrollbar-color: #667eea #f1f1f1;
 }
 
-/* Totals container - sticky at bottom, syncs horizontal scroll */
+/* Totals container - sticky at bottom, scroll synced with main table */
 .totals-container {
-    overflow-x: hidden;
+    overflow-x: scroll;
+    overflow-y: hidden;
     border-top: 3px solid #2c3e50;
     background: #f8f9fa;
     flex-shrink: 0;
+    /* Hide scrollbar but keep scroll functionality */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+}
+
+.totals-container::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
 }
 
 #totalsTable {
@@ -1282,27 +1292,7 @@ thead .col-setall {
     background: #fef6e8 !important;
 }
 
-/* Separate totals container - always visible at bottom */
-.totals-container {
-    overflow-x: hidden;
-    border: 1px solid #e9ecef;
-    border-top: none;
-    border-radius: 0 0 12px 12px;
-    background: white;
-}
-
-#totalsTable {
-    border-collapse: separate;
-    border-spacing: 0;
-    table-layout: fixed;
-}
-
-#totalsTable td {
-    padding: 10px 8px;
-    text-align: center;
-    border: 1px solid #e9ecef;
-    box-sizing: border-box;
-}
+/* Note: totals container styles are defined in the "sticky totals" section above */
 
 /* Totals Rows */
 .total-row {

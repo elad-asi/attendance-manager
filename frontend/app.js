@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.5.14';  // Sticky totals footer with scroll sync
+const FE_VERSION = '2.6.0';  // Totals row improvements
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -2176,15 +2176,56 @@ function syncTotalsWithMainTable() {
     // Copy main table width to totals table
     totalsTable.style.width = mainTable.offsetWidth + 'px';
 
+    // Sync column widths from main table header to totals table
+    const headerCells = mainTable.querySelectorAll('thead tr th');
+    const totalsRows = totalsTable.querySelectorAll('tbody tr');
+
+    // Get widths of all header cells
+    const columnWidths = Array.from(headerCells).map(th => th.offsetWidth);
+
+    // Calculate the total width of fixed columns (for the label colspan cell)
+    // Find the first date column (after all fixed columns)
+    let fixedColsCount = 11; // default
+    if (skippedColumns.includes('mahlaka')) fixedColsCount--;
+    if (skippedColumns.includes('miktzoaTzvai')) fixedColsCount--;
+
+    const fixedColsWidth = columnWidths.slice(0, fixedColsCount).reduce((sum, w) => sum + w, 0);
+
+    // Apply widths to totals rows
+    totalsRows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length === 0) return;
+
+        // First cell is the label with colspan - set its width to match all fixed columns
+        const labelCell = cells[0];
+        if (labelCell.classList.contains('total-label')) {
+            labelCell.style.width = fixedColsWidth + 'px';
+            labelCell.style.minWidth = fixedColsWidth + 'px';
+        }
+
+        // Remaining cells are date cells - match their widths to date columns
+        for (let i = 1; i < cells.length; i++) {
+            const mainColIndex = fixedColsCount + (i - 1);
+            if (columnWidths[mainColIndex]) {
+                cells[i].style.width = columnWidths[mainColIndex] + 'px';
+                cells[i].style.minWidth = columnWidths[mainColIndex] + 'px';
+            }
+        }
+    });
+
     // Sync horizontal scroll from main to totals
     mainContainer.removeEventListener('scroll', syncScrollHandler);
     mainContainer.addEventListener('scroll', syncScrollHandler);
+
+    // Initial sync of scroll position
+    syncScrollHandler();
 }
 
 function syncScrollHandler() {
     const mainContainer = document.getElementById('mainTableContainer');
     const totalsContainer = document.getElementById('totalsContainer');
     if (mainContainer && totalsContainer) {
+        // Sync scrollLeft - works now with overflow-x:scroll and hidden scrollbar
         totalsContainer.scrollLeft = mainContainer.scrollLeft;
     }
 }
@@ -2233,18 +2274,51 @@ function renderTotalRows(totalsTbody, dates, filteredMembers) {
 
     const membersToCount = filteredMembers || teamMembers;
 
-    // Calculate colspan based on skipped columns (base 11 minus skipped - includes setall column)
-    let colspanCount = 11;
-    if (skippedColumns.includes('mahlaka')) colspanCount--;
-    if (skippedColumns.includes('miktzoaTzvai')) colspanCount--;
+    // Fixed columns that appear before date columns
+    // These must match the main table header exactly
+    const fixedColumns = [
+        { class: 'col-index', width: 40 },
+        { class: 'col-firstname', width: 80 },
+        { class: 'col-lastname', width: 80 },
+        { class: 'col-ma', width: 70 },
+        { class: 'col-gdud', width: 70 },
+        { class: 'col-pluga', width: 70 }
+    ];
 
-    totals.forEach(total => {
+    // Add optional columns if not skipped
+    if (!skippedColumns.includes('mahlaka')) {
+        fixedColumns.push({ class: 'col-mahlaka', width: 60 });
+    }
+    if (!skippedColumns.includes('miktzoaTzvai')) {
+        fixedColumns.push({ class: 'col-miktzoa', width: 80 });
+    }
+
+    // Add dorech, yamam, setall columns
+    fixedColumns.push({ class: 'col-dorech', width: 50 });
+    fixedColumns.push({ class: 'col-yamam', width: 50 });
+    fixedColumns.push({ class: 'col-setall', width: 45 });
+
+    totals.forEach((total, idx) => {
         const row = document.createElement('tr');
         row.className = 'total-row';
-        row.innerHTML = `
-            <td class="total-label" colspan="${colspanCount}">${total.label} <span class="total-symbols">${total.symbols}</span></td>
-        `;
 
+        // Create individual cells for each fixed column
+        fixedColumns.forEach((col, colIdx) => {
+            const cell = document.createElement('td');
+            cell.className = `total-fixed-cell ${col.class}`;
+            cell.style.minWidth = col.width + 'px';
+
+            // Put the label in the first cell (index column)
+            if (colIdx === 0) {
+                cell.innerHTML = `${total.label} <span class="total-symbols">${total.symbols}</span>`;
+                cell.className = 'total-label';
+                cell.colSpan = fixedColumns.length; // Span all fixed columns
+                row.appendChild(cell);
+                return; // Skip adding other fixed cells since we're using colspan
+            }
+        });
+
+        // Add date cells
         dates.forEach(date => {
             const dateStr = formatDate(date);
             const count = calculateTotal(dateStr, TOTALS_CONFIG[total.key], membersToCount);
