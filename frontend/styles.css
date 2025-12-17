@@ -1253,28 +1253,22 @@ thead .col-setall {
     background: #fef6e8 !important;
 }
 
-/* Sticky footer for totals */
-#attendanceTfoot {
+/* Sticky footer for totals - each row needs sticky positioning */
+#attendanceTfoot .total-row {
     position: sticky;
-    bottom: 0;
     z-index: 5;
 }
 
-#attendanceTfoot .total-row td {
-    position: sticky;
-    bottom: 0;
+/* Stack the 3 total rows at the bottom with calculated positions */
+#attendanceTfoot .total-row:nth-child(1) {
+    bottom: 76px; /* 2 rows below × 38px each */
 }
 
-/* Stack the 3 total rows at the bottom */
-#attendanceTfoot .total-row:nth-child(1) td {
-    bottom: calc(2 * 38px); /* Height of 2 rows below it */
+#attendanceTfoot .total-row:nth-child(2) {
+    bottom: 38px; /* 1 row below × 38px */
 }
 
-#attendanceTfoot .total-row:nth-child(2) td {
-    bottom: 38px; /* Height of 1 row below it */
-}
-
-#attendanceTfoot .total-row:nth-child(3) td {
+#attendanceTfoot .total-row:nth-child(3) {
     bottom: 0;
 }
 

@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.5.9';  // Sticky total rows at bottom when scrolling
+const FE_VERSION = '2.5.10';  // Fix sticky total rows
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
