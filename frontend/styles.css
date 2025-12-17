@@ -854,16 +854,44 @@ header h1 {
     padding-top: 0;
 }
 
+/* Wrapper for main table + sticky totals */
+.tables-wrapper {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
 .table-container {
     overflow-x: auto;
     overflow-y: auto;
     max-height: calc(100vh - 550px);
-    border: 1px solid #e9ecef;
-    border-radius: 12px 12px 0 0;
-    border-bottom: none;
     /* Always show scrollbars */
     scrollbar-width: auto;
     scrollbar-color: #667eea #f1f1f1;
+}
+
+/* Totals container - sticky at bottom, syncs horizontal scroll */
+.totals-container {
+    overflow-x: hidden;
+    border-top: 3px solid #2c3e50;
+    background: #f8f9fa;
+    flex-shrink: 0;
+}
+
+#totalsTable {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+}
+
+#totalsTable td {
+    padding: 10px 8px;
+    text-align: center;
+    border: 1px solid #e9ecef;
+    border-top: none;
 }
 
 /* Webkit scrollbar styling (Chrome, Safari, Edge) */

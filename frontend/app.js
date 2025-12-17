@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.5.13';  // Totals as regular rows at end of tbody (never filtered)
+const FE_VERSION = '2.5.14';  // Sticky totals footer with scroll sync
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -2150,14 +2150,43 @@ function renderTable() {
         tbody.appendChild(row);
     });
 
-    // Add total rows directly to tbody (at the end, never filtered)
-    renderTotalRows(tbody, dates, unitFilteredMembers);
+    // Render totals to separate sticky container
+    const totalsTbody = document.getElementById('totalsTbody');
+    renderTotalRows(totalsTbody, dates, unitFilteredMembers);
+
+    // Sync totals table width and scroll with main table
+    syncTotalsWithMainTable();
 
     // Update unit selector (includes יממ summary)
     renderUnitSelector();
 
     // Attach event listeners to header search inputs
     attachHeaderSearchListeners();
+}
+
+// Sync totals table horizontal scroll and column widths with main table
+function syncTotalsWithMainTable() {
+    const mainContainer = document.getElementById('mainTableContainer');
+    const totalsContainer = document.getElementById('totalsContainer');
+    const mainTable = document.getElementById('attendanceTable');
+    const totalsTable = document.getElementById('totalsTable');
+
+    if (!mainContainer || !totalsContainer || !mainTable || !totalsTable) return;
+
+    // Copy main table width to totals table
+    totalsTable.style.width = mainTable.offsetWidth + 'px';
+
+    // Sync horizontal scroll from main to totals
+    mainContainer.removeEventListener('scroll', syncScrollHandler);
+    mainContainer.addEventListener('scroll', syncScrollHandler);
+}
+
+function syncScrollHandler() {
+    const mainContainer = document.getElementById('mainTableContainer');
+    const totalsContainer = document.getElementById('totalsContainer');
+    if (mainContainer && totalsContainer) {
+        totalsContainer.scrollLeft = mainContainer.scrollLeft;
+    }
 }
 
 // Attach event listeners for header search inputs (with debounce)
@@ -2191,9 +2220,9 @@ function attachHeaderSearchListeners() {
     });
 }
 
-function renderTotalRows(tbody, dates, filteredMembers) {
-    // Remove any existing total rows (don't clear entire tbody, just total rows)
-    tbody.querySelectorAll('.total-row').forEach(row => row.remove());
+function renderTotalRows(totalsTbody, dates, filteredMembers) {
+    // Clear the totals tbody completely (it's separate from the main table)
+    totalsTbody.innerHTML = '';
 
     // Using HTML for colored symbols: green ✓ for present, red ✓ for counted
     const totals = [
@@ -2225,7 +2254,7 @@ function renderTotalRows(tbody, dates, filteredMembers) {
             row.appendChild(cell);
         });
 
-        tbody.appendChild(row);
+        totalsTbody.appendChild(row);
     });
 }
 

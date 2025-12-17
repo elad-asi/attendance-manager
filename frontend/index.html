@@ -149,29 +149,38 @@
                     <span class="total-value" id="totalYamamValue">0</span>
                 </div>
             </div>
-            <div class="table-container" id="mainTableContainer">
-                <table id="attendanceTable">
-                    <thead>
-                        <tr id="headerRow">
-                            <th class="sticky-col col-index">#</th>
-                            <th class="sticky-col col-firstname">שם פרטי</th>
-                            <th class="sticky-col col-lastname">שם משפחה</th>
-                            <th class="sticky-col col-ma">מ.א</th>
-                            <th class="sticky-col col-gdud">גדוד</th>
-                            <th class="sticky-col col-pluga">פלוגה</th>
-                            <th class="sticky-col col-mahlaka">מחלקה</th>
-                            <th class="sticky-col col-miktzoa">מקצוע צבאי</th>
-                            <th class="sticky-col col-dorech">דורך</th>
-                            <th class="sticky-col col-yamam">ימ"מ</th>
-                            <th class="sticky-col col-setall">מלא</th>
-                            <!-- Date columns will be added dynamically -->
-                        </tr>
-                    </thead>
-                    <tbody id="attendanceBody">
-                        <!-- Rows will be added dynamically -->
-                        <!-- Total rows will be appended at the end of tbody (never filtered) -->
-                    </tbody>
-                </table>
+            <div class="tables-wrapper">
+                <div class="table-container" id="mainTableContainer">
+                    <table id="attendanceTable">
+                        <thead>
+                            <tr id="headerRow">
+                                <th class="sticky-col col-index">#</th>
+                                <th class="sticky-col col-firstname">שם פרטי</th>
+                                <th class="sticky-col col-lastname">שם משפחה</th>
+                                <th class="sticky-col col-ma">מ.א</th>
+                                <th class="sticky-col col-gdud">גדוד</th>
+                                <th class="sticky-col col-pluga">פלוגה</th>
+                                <th class="sticky-col col-mahlaka">מחלקה</th>
+                                <th class="sticky-col col-miktzoa">מקצוע צבאי</th>
+                                <th class="sticky-col col-dorech">דורך</th>
+                                <th class="sticky-col col-yamam">ימ"מ</th>
+                                <th class="sticky-col col-setall">מלא</th>
+                                <!-- Date columns will be added dynamically -->
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceBody">
+                            <!-- Rows will be added dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <!-- Sticky totals footer - always visible at bottom -->
+                <div class="totals-container" id="totalsContainer">
+                    <table id="totalsTable">
+                        <tbody id="totalsTbody">
+                            <!-- Total rows will be added dynamically -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
             <p id="noDataMsg" class="no-data">עדיין לא נוספו חברי צוות. טען מ-Google Sheets.</p>
         </section>
