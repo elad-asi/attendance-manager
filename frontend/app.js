@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.6.0';  // Totals row improvements
+const FE_VERSION = '2.6.1';  // Allow editing past dates
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -2140,10 +2140,8 @@ function renderTable() {
             cell.dataset.tooltip = STATUS_TOOLTIPS[status];
             cell.dataset.ma = member.ma;
             cell.dataset.date = dateStr;
-            // Only allow clicking on today and future dates
-            if (!isPast) {
-                cell.addEventListener('click', () => cycleStatus(cell, member.ma, dateStr));
-            }
+            // Allow clicking on all dates (including past)
+            cell.addEventListener('click', () => cycleStatus(cell, member.ma, dateStr));
             row.appendChild(cell);
         });
 
