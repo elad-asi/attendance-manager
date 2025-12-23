@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.6.1';  // Allow editing past dates
+const FE_VERSION = '2.6.2';  // Change counted symbol from ✓ to ○
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -83,7 +83,7 @@ const STATUS_LABELS = {
     'absent': '✗',
     'arriving': '+',
     'leaving': '-',
-    'counted': '✓'
+    'counted': '○'
 };
 
 // Hebrew tooltips for each status
@@ -93,7 +93,7 @@ const STATUS_TOOLTIPS = {
     'absent': 'נעדר (✗)',
     'arriving': 'מגיע (+)',
     'leaving': 'יוצא (-)',
-    'counted': 'חופש (✓)'
+    'counted': 'חופש (○)'
 };
 
 // Define which statuses count for each total
@@ -2263,11 +2263,11 @@ function renderTotalRows(totalsTbody, dates, filteredMembers) {
     // Clear the totals tbody completely (it's separate from the main table)
     totalsTbody.innerHTML = '';
 
-    // Using HTML for colored symbols: green ✓ for present, red ✓ for counted
+    // Using HTML for colored symbols: green ✓ for present, red ○ for counted
     const totals = [
         { key: 'mission', label: STRINGS.totalMission, symbols: '(<span class="symbol-present">✓</span> +)', class: 'total-mission' },
         { key: 'includeLeave', label: STRINGS.totalIncludeLeave, symbols: '(<span class="symbol-present">✓</span> + -)', class: 'total-leave' },
-        { key: 'counted', label: STRINGS.totalCounted, symbols: '(<span class="symbol-present">✓</span> + - <span class="symbol-counted">✓</span>)', class: 'total-counted' }
+        { key: 'counted', label: STRINGS.totalCounted, symbols: '(<span class="symbol-present">✓</span> + - <span class="symbol-counted">○</span>)', class: 'total-counted' }
     ];
 
     const membersToCount = filteredMembers || teamMembers;
