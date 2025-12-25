@@ -3,7 +3,7 @@ services:
     name: attendance-manager
     env: python
     buildCommand: pip install -r backend/requirements.txt
-    startCommand: cd backend && gunicorn --workers 1 --threads 4 --preload app:app
+    startCommand: cd backend && gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --preload app:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
