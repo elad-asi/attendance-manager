@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>מנהל נוכחות - מובייל</title>
+    <link rel="stylesheet" href="mobile.css">
+</head>
+<body>
+    <header>
+        <h1>📋 מנהל נוכחות</h1>
+        <div class="version-info">v2.8.0-mobile</div>
+    </header>
+
+    <main id="mainContent">
+        <!-- Login Section (shown when not logged in) -->
+        <section class="login-section" id="loginSection">
+            <h2>התחברות</h2>
+            <div class="login-form">
+                <input type="email" id="loginEmail" placeholder="אימייל" dir="ltr">
+                <button id="sendCodeBtn" class="btn-primary">שלח קוד</button>
+            </div>
+            <div class="verify-form" id="verifyForm" style="display: none;">
+                <input type="text" id="verifyCode" placeholder="הכנס קוד" dir="ltr">
+                <button id="verifyCodeBtn" class="btn-primary">אימות</button>
+            </div>
+            <p class="login-status" id="loginStatus"></p>
+        </section>
+
+        <!-- App Section (shown when logged in) -->
+        <section class="app-section" id="appSection" style="display: none;">
+            <!-- Date Navigation -->
+            <div class="date-nav" id="dateNav">
+                <button id="prevDate" class="nav-btn">◀</button>
+                <div class="date-display">
+                    <div class="date-text" id="currentDateText">--</div>
+                    <div class="day-name" id="currentDayName">--</div>
+                </div>
+                <button id="nextDate" class="nav-btn">▶</button>
+            </div>
+
+            <!-- Summary -->
+            <div class="summary-bar">
+                <div class="summary-item dorech">
+                    <span class="label">דורך</span>
+                    <span class="value" id="dorechCount">0</span>
+                </div>
+                <div class="summary-item yamam">
+                    <span class="label">ימ"מ</span>
+                    <span class="value" id="yamamCount">0</span>
+                </div>
+                <div class="summary-item total">
+                    <span class="label">סה"כ</span>
+                    <span class="value" id="totalCount">0</span>
+                </div>
+            </div>
+
+            <!-- Search -->
+            <div class="search-bar">
+                <input type="text" id="searchInput" placeholder="🔍 חיפוש לפי שם...">
+            </div>
+
+            <!-- Cards List -->
+            <div class="cards-container" id="cardsContainer">
+                <p class="loading-msg">טוען נתונים...</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- Toast for save feedback -->
+    <div id="saveToast" class="toast"></div>
+
+    <script src="mobile.js"></script>
+</body>
+</html>

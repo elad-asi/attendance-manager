@@ -1,0 +1,358 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    direction: rtl;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif, 'Arial Hebrew', 'David', 'Narkisim';
+    background: #f0f2f5;
+    min-height: 100vh;
+    direction: rtl;
+}
+
+header {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    color: white;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+header h1 {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.version-info {
+    font-size: 0.7rem;
+    opacity: 0.7;
+}
+
+main {
+    padding: 0;
+}
+
+/* Login Section */
+.login-section {
+    padding: 30px 20px;
+    background: white;
+    margin: 15px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.login-section h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #2c3e50;
+}
+
+.login-form, .verify-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.login-form input, .verify-form input {
+    padding: 14px 16px;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    font-size: 1rem;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 14px 20px;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.btn-primary:disabled {
+    opacity: 0.6;
+}
+
+.login-status {
+    text-align: center;
+    margin-top: 15px;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.login-status.error {
+    color: #dc3545;
+}
+
+.login-status.success {
+    color: #28a745;
+}
+
+/* App Section */
+.app-section {
+    padding-bottom: 20px;
+}
+
+/* Date Navigation */
+.date-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 15px;
+    background: #2c3e50;
+    color: white;
+}
+
+.nav-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-btn:hover, .nav-btn:active {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.nav-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.date-display {
+    text-align: center;
+    min-width: 130px;
+}
+
+.date-text {
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.day-name {
+    font-size: 0.85rem;
+    opacity: 0.8;
+    margin-top: 2px;
+}
+
+/* Summary Bar */
+.summary-bar {
+    display: flex;
+    justify-content: space-around;
+    padding: 15px;
+    background: white;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.summary-item {
+    text-align: center;
+}
+
+.summary-item .label {
+    font-size: 0.75rem;
+    color: #666;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.summary-item .value {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.summary-item.dorech .value {
+    color: #155724;
+}
+
+.summary-item.yamam .value {
+    color: #5a3d8a;
+}
+
+.summary-item.total .value {
+    color: #2c3e50;
+}
+
+/* Search Bar */
+.search-bar {
+    padding: 12px 15px;
+    background: white;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.search-bar input {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    font-size: 1rem;
+    background: #f8f9fa;
+}
+
+.search-bar input:focus {
+    outline: none;
+    border-color: #667eea;
+    background: white;
+}
+
+/* Cards Container */
+.cards-container {
+    padding: 15px;
+}
+
+.loading-msg, .no-data-msg {
+    text-align: center;
+    padding: 40px 20px;
+    color: #666;
+    font-size: 1rem;
+}
+
+/* Person Card */
+.person-card {
+    background: white;
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e9ecef;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.person-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.person-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 4px;
+}
+
+.person-details {
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.person-notes {
+    font-size: 0.75rem;
+    color: #888;
+    margin-top: 6px;
+    font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Status Button */
+.status-btn {
+    width: 65px;
+    height: 65px;
+    border-radius: 12px;
+    border: 3px solid;
+    font-size: 1.8rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.status-btn:active {
+    transform: scale(0.92);
+}
+
+.status-btn.unmarked {
+    background: #f8f9fa;
+    border-color: #dee2e6;
+    color: #adb5bd;
+}
+
+.status-btn.present {
+    background: #d4edda;
+    border-color: #28a745;
+    color: #155724;
+}
+
+.status-btn.absent {
+    background: #f8d7da;
+    border-color: #dc3545;
+    color: #721c24;
+}
+
+.status-btn.arriving {
+    background: #cce5ff;
+    border-color: #007bff;
+    color: #004085;
+}
+
+.status-btn.leaving {
+    background: #fff3cd;
+    border-color: #ffc107;
+    color: #856404;
+}
+
+.status-btn.counted {
+    background: #f8d7da;
+    border-color: #dc3545;
+    color: #721c24;
+}
+
+/* Toast */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: #2c3e50;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    opacity: 0;
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+
+.toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+}
+
+.toast.error {
+    background: #dc3545;
+}
+
+.toast.success {
+    background: #28a745;
+}
+
+/* Weekend highlight */
+.date-nav.weekend {
+    background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
+}
