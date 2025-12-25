@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '2.6.2'  # Added mobile view support
+BE_VERSION = '2.6.3'  # Fix duplicate route causing Render crash
 
 # NOTE: Using local SQLite for fast reads/writes with periodic Neon sync
 
@@ -438,12 +438,6 @@ def parse_sheet_with_mapping():
 # ============================================
 # Backup API
 # ============================================
-
-@app.route('/api/backups', methods=['GET'])
-def get_backups():
-    """List all available backups"""
-    backups = db.list_backups()
-    return jsonify({'backups': backups})
 
 @app.route('/api/backups/create', methods=['POST'])
 def create_backup():
