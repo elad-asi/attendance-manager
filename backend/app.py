@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '2.6.1'  # Fix notes parsing in parse-with-mapping endpoint
+BE_VERSION = '2.6.2'  # Added mobile view support
 
 # NOTE: Using local SQLite for fast reads/writes with periodic Neon sync
 
