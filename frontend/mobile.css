@@ -151,6 +151,14 @@ main {
     margin-top: 4px;
 }
 
+.sheets-note {
+    text-align: center;
+    font-size: 0.8rem;
+    color: #888;
+    margin-top: 15px;
+    font-style: italic;
+}
+
 /* Sheet Header */
 .sheet-header {
     display: flex;

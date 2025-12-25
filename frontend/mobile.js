@@ -2,7 +2,7 @@
 // Attendance Manager - Mobile JavaScript
 // ============================================
 
-const MOBILE_VERSION = '2.9.0';
+const MOBILE_VERSION = '2.9.1';
 
 // API Base URL
 const API_BASE = '/api';
@@ -79,6 +79,7 @@ function setupEventListeners() {
 
     // Sheet change
     document.getElementById('changeSheetBtn').addEventListener('click', () => showSheetSelection(true));
+
 }
 
 // ============================================
@@ -184,24 +185,28 @@ async function showSheetSelection(forceShow = false) {
     try {
         const response = await fetch(`${API_BASE}/sheets`);
         const data = await response.json();
-        allSheets = data.sheets || [];
+        // API returns array directly, not { sheets: [...] }
+        allSheets = Array.isArray(data) ? data : (data.sheets || []);
 
         if (allSheets.length === 0) {
-            showLogin();
-            showStatus('אין גיליונות זמינים. נא לטעון נתונים מהמחשב תחילה.', 'error');
+            // Show sheet selection section with "load new" option
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('sheetSelectSection').style.display = 'block';
+            document.getElementById('appSection').style.display = 'none';
+            document.getElementById('sheetsList').innerHTML = '<p style="text-align:center;color:#666;">אין גיליונות טעונים</p>';
             return;
         }
 
         // If only one sheet or we have a saved selection and not forcing, go directly to app
         if (!forceShow && allSheets.length === 1) {
-            await selectSheet(allSheets[0].id);
+            await selectSheet(allSheets[0].spreadsheet_id);
             return;
         }
 
         if (!forceShow && currentSpreadsheetId) {
-            const savedSheet = allSheets.find(s => s.id === currentSpreadsheetId);
+            const savedSheet = allSheets.find(s => s.spreadsheet_id === currentSpreadsheetId);
             if (savedSheet) {
-                await selectSheet(savedSheet.id);
+                await selectSheet(savedSheet.spreadsheet_id);
                 return;
             }
         }
@@ -214,7 +219,7 @@ async function showSheetSelection(forceShow = false) {
         // Render sheets list
         const listEl = document.getElementById('sheetsList');
         listEl.innerHTML = allSheets.map(sheet => `
-            <div class="sheet-item" onclick="selectSheet('${sheet.id}')">
+            <div class="sheet-item" onclick="selectSheet('${sheet.spreadsheet_id}')">
                 <div class="sheet-title">${sheet.spreadsheet_title || sheet.sheet_name || 'גיליון'}</div>
                 <div class="sheet-info">${sheet.gdud || ''} ${sheet.pluga ? '/ ' + sheet.pluga : ''}</div>
             </div>
@@ -230,7 +235,7 @@ async function showSheetSelection(forceShow = false) {
 async function selectSheet(spreadsheetId) {
     currentSpreadsheetId = spreadsheetId;
     localStorage.setItem('current_spreadsheet_id', spreadsheetId);
-    currentSheetInfo = allSheets.find(s => s.id === spreadsheetId);
+    currentSheetInfo = allSheets.find(s => s.spreadsheet_id === spreadsheetId);
     showApp();
     await loadData();
 }
