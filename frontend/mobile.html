@@ -9,7 +9,7 @@
 <body>
     <header>
         <h1>📋 מנהל נוכחות</h1>
-        <div class="version-info">v2.8.0-mobile</div>
+        <div class="version-info">v2.9.0-mobile</div>
     </header>
 
     <main id="mainContent">
@@ -27,8 +27,20 @@
             <p class="login-status" id="loginStatus"></p>
         </section>
 
+        <!-- Sheet Selection (shown after login if multiple sheets) -->
+        <section class="sheet-select-section" id="sheetSelectSection" style="display: none;">
+            <h2>בחר גיליון</h2>
+            <div class="sheets-list" id="sheetsList"></div>
+        </section>
+
         <!-- App Section (shown when logged in) -->
         <section class="app-section" id="appSection" style="display: none;">
+            <!-- Sheet Header -->
+            <div class="sheet-header" id="sheetHeader" style="display: none;">
+                <span class="sheet-name" id="currentSheetName"></span>
+                <button class="change-sheet-btn" id="changeSheetBtn">החלף</button>
+            </div>
+
             <!-- Date Navigation -->
             <div class="date-nav" id="dateNav">
                 <button id="prevDate" class="nav-btn">◀</button>

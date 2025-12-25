@@ -2,7 +2,7 @@
 // Attendance Manager - Mobile JavaScript
 // ============================================
 
-const MOBILE_VERSION = '2.8.0';
+const MOBILE_VERSION = '2.9.0';
 
 // API Base URL
 const API_BASE = '/api';
@@ -11,6 +11,8 @@ const API_BASE = '/api';
 let teamMembers = [];
 let attendanceData = {};
 let currentSpreadsheetId = null;
+let currentSheetInfo = null;
+let allSheets = [];
 let selectedDate = null;
 let dates = [];
 let authSessionToken = null;
@@ -51,8 +53,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Validate session
         const valid = await validateSession();
         if (valid) {
-            showApp();
-            await loadData();
+            await showSheetSelection();
         } else {
             showLogin();
         }
@@ -75,6 +76,9 @@ function setupEventListeners() {
 
     // Search
     document.getElementById('searchInput').addEventListener('input', renderCards);
+
+    // Sheet change
+    document.getElementById('changeSheetBtn').addEventListener('click', () => showSheetSelection(true));
 }
 
 // ============================================
@@ -152,8 +156,7 @@ async function verifyCode() {
             authSessionToken = data.sessionToken;
             localStorage.setItem('auth_session_token', authSessionToken);
             localStorage.setItem('auth_user_email', currentUserEmail);
-            showApp();
-            await loadData();
+            await showSheetSelection();
         } else {
             showStatus(data.error || 'קוד שגוי', 'error');
         }
@@ -172,12 +175,77 @@ function showStatus(message, type = '') {
 
 function showLogin() {
     document.getElementById('loginSection').style.display = 'block';
+    document.getElementById('sheetSelectSection').style.display = 'none';
     document.getElementById('appSection').style.display = 'none';
+}
+
+async function showSheetSelection(forceShow = false) {
+    // Fetch available sheets
+    try {
+        const response = await fetch(`${API_BASE}/sheets`);
+        const data = await response.json();
+        allSheets = data.sheets || [];
+
+        if (allSheets.length === 0) {
+            showLogin();
+            showStatus('אין גיליונות זמינים. נא לטעון נתונים מהמחשב תחילה.', 'error');
+            return;
+        }
+
+        // If only one sheet or we have a saved selection and not forcing, go directly to app
+        if (!forceShow && allSheets.length === 1) {
+            await selectSheet(allSheets[0].id);
+            return;
+        }
+
+        if (!forceShow && currentSpreadsheetId) {
+            const savedSheet = allSheets.find(s => s.id === currentSpreadsheetId);
+            if (savedSheet) {
+                await selectSheet(savedSheet.id);
+                return;
+            }
+        }
+
+        // Show sheet selection
+        document.getElementById('loginSection').style.display = 'none';
+        document.getElementById('sheetSelectSection').style.display = 'block';
+        document.getElementById('appSection').style.display = 'none';
+
+        // Render sheets list
+        const listEl = document.getElementById('sheetsList');
+        listEl.innerHTML = allSheets.map(sheet => `
+            <div class="sheet-item" onclick="selectSheet('${sheet.id}')">
+                <div class="sheet-title">${sheet.spreadsheet_title || sheet.sheet_name || 'גיליון'}</div>
+                <div class="sheet-info">${sheet.gdud || ''} ${sheet.pluga ? '/ ' + sheet.pluga : ''}</div>
+            </div>
+        `).join('');
+
+    } catch (error) {
+        console.error('Error fetching sheets:', error);
+        showLogin();
+        showStatus('שגיאה בטעינת גיליונות', 'error');
+    }
+}
+
+async function selectSheet(spreadsheetId) {
+    currentSpreadsheetId = spreadsheetId;
+    localStorage.setItem('current_spreadsheet_id', spreadsheetId);
+    currentSheetInfo = allSheets.find(s => s.id === spreadsheetId);
+    showApp();
+    await loadData();
 }
 
 function showApp() {
     document.getElementById('loginSection').style.display = 'none';
+    document.getElementById('sheetSelectSection').style.display = 'none';
     document.getElementById('appSection').style.display = 'block';
+
+    // Show sheet header if we have sheet info
+    if (currentSheetInfo) {
+        document.getElementById('sheetHeader').style.display = 'flex';
+        document.getElementById('currentSheetName').textContent =
+            currentSheetInfo.spreadsheet_title || currentSheetInfo.sheet_name || 'גיליון';
+    }
 }
 
 // ============================================
@@ -189,18 +257,8 @@ async function loadData() {
     container.innerHTML = '<p class="loading-msg">טוען נתונים...</p>';
 
     try {
-        // Get spreadsheet ID from localStorage or fetch default
         if (!currentSpreadsheetId) {
-            const sheetsResponse = await fetch(`${API_BASE}/sheets`);
-            const sheetsData = await sheetsResponse.json();
-            if (sheetsData.sheets && sheetsData.sheets.length > 0) {
-                currentSpreadsheetId = sheetsData.sheets[0].id;
-                localStorage.setItem('current_spreadsheet_id', currentSpreadsheetId);
-            }
-        }
-
-        if (!currentSpreadsheetId) {
-            container.innerHTML = '<p class="no-data-msg">אין נתונים. נא לטעון נתונים מהמחשב תחילה.</p>';
+            container.innerHTML = '<p class="no-data-msg">אין נתונים. נא לבחור גיליון.</p>';
             return;
         }
 

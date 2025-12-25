@@ -100,6 +100,81 @@ main {
     color: #28a745;
 }
 
+/* Sheet Selection */
+.sheet-select-section {
+    padding: 20px 15px;
+    background: white;
+    margin: 15px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.sheet-select-section h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #2c3e50;
+}
+
+.sheets-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.sheet-item {
+    padding: 15px;
+    background: #f8f9fa;
+    border: 2px solid #dee2e6;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.sheet-item:active {
+    transform: scale(0.98);
+}
+
+.sheet-item:hover {
+    border-color: #667eea;
+    background: #f0f4ff;
+}
+
+.sheet-item .sheet-title {
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: #2c3e50;
+}
+
+.sheet-item .sheet-info {
+    font-size: 0.85rem;
+    color: #666;
+    margin-top: 4px;
+}
+
+/* Sheet Header */
+.sheet-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    background: #34495e;
+    color: white;
+}
+
+.sheet-name {
+    font-weight: 600;
+}
+
+.change-sheet-btn {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
 /* App Section */
 .app-section {
     padding-bottom: 20px;
