@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.6.2';  // Change counted symbol from ✓ to ○
+const FE_VERSION = '2.7.0';  // Add optional notes column
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -113,6 +113,7 @@ const STRINGS = {
     pluga: 'פלוגה',
     mahlaka: 'מחלקה',
     miktzoaTzvai: 'מקצוע צבאי',
+    notes: 'הערות',
     dorech: 'דורך',
     yamam: 'ימ"מ',
     totalMission: 'דורך',
@@ -1315,7 +1316,8 @@ const MAPPING_FIELDS = [
     { key: 'lastName', label: 'שם משפחה', required: true },
     { key: 'ma', label: 'מספר אישי (מ.א)', required: true },
     { key: 'mahlaka', label: 'מחלקה', required: false },
-    { key: 'miktzoaTzvai', label: 'מקצוע צבאי', required: false }
+    { key: 'miktzoaTzvai', label: 'מקצוע צבאי', required: false },
+    { key: 'notes', label: 'הערות', required: false }
 ];
 
 async function loadFromGoogleSheets() {
@@ -1383,6 +1385,7 @@ function parseRowsWithMapping(rows, columnMapping, gdud, pluga) {
             ma: getValue('ma'),
             mahlaka: columnMapping.mahlaka === 'skip' ? '' : getValue('mahlaka'),
             miktzoaTzvai: columnMapping.miktzoaTzvai === 'skip' ? '' : getValue('miktzoaTzvai'),
+            notes: columnMapping.notes === 'skip' ? '' : getValue('notes'),
             gdud: gdud,
             pluga: pluga
         };
@@ -2024,9 +2027,10 @@ function renderTable() {
     // Check which columns are skipped
     const showMahlaka = !skippedColumns.includes('mahlaka');
     const showMiktzoaTzvai = !skippedColumns.includes('miktzoaTzvai');
+    const showNotes = !skippedColumns.includes('notes');
 
     // Calculate right positions dynamically based on visible columns
-    // Base widths: index=40, firstname=80, lastname=80, ma=70, gdud=70, pluga=70, mahlaka=60, miktzoa=80, dorech=50, yamam=50
+    // Base widths: index=40, firstname=80, lastname=80, ma=70, gdud=70, pluga=70, mahlaka=60, miktzoa=80, notes=100, dorech=50, yamam=50
     let rightPos = 0;
     const colPositions = {};
     colPositions.index = rightPos;
@@ -2049,6 +2053,10 @@ function renderTable() {
         colPositions.miktzoa = rightPos;
         rightPos += 80;
     }
+    if (showNotes) {
+        colPositions.notes = rightPos;
+        rightPos += 100;
+    }
     colPositions.dorech = rightPos;
     rightPos += 50;
     colPositions.yamam = rightPos;
@@ -2065,6 +2073,7 @@ function renderTable() {
         <th class="sticky-col col-pluga" style="right: ${colPositions.pluga}px">${plugaFilter}</th>
         ${showMahlaka ? `<th class="sticky-col col-mahlaka" style="right: ${colPositions.mahlaka}px">${mahlakaFilter}</th>` : ''}
         ${showMiktzoaTzvai ? `<th class="sticky-col col-miktzoa" style="right: ${colPositions.miktzoa}px">${STRINGS.miktzoaTzvai}</th>` : ''}
+        ${showNotes ? `<th class="sticky-col col-notes" style="right: ${colPositions.notes}px">${STRINGS.notes}</th>` : ''}
         <th class="sticky-col col-dorech" style="right: ${colPositions.dorech}px">${STRINGS.dorech}</th>
         <th class="sticky-col col-yamam" style="right: ${colPositions.yamam}px">${STRINGS.yamam}</th>
         <th class="sticky-col col-setall" style="right: ${colPositions.setall}px">מלא</th>
@@ -2118,6 +2127,7 @@ function renderTable() {
             <td class="sticky-col" style="right: ${colPositions.pluga}px">${member.pluga || ''}</td>
             ${showMahlaka ? `<td class="sticky-col" style="right: ${colPositions.mahlaka}px">${member.mahlaka || ''}</td>` : ''}
             ${showMiktzoaTzvai ? `<td class="sticky-col col-miktzoa" style="right: ${colPositions.miktzoa}px">${member.miktzoaTzvai || ''}</td>` : ''}
+            ${showNotes ? `<td class="sticky-col col-notes" style="right: ${colPositions.notes}px" title="${member.notes || ''}">${member.notes || ''}</td>` : ''}
             <td class="sticky-col col-dorech member-dorech" style="right: ${colPositions.dorech}px" data-ma="${member.ma}">${memberDorech}</td>
             <td class="sticky-col col-yamam member-yamam" style="right: ${colPositions.yamam}px" data-ma="${member.ma}">${memberYamam}</td>
             <td class="sticky-col col-setall" style="right: ${colPositions.setall}px"><button class="btn-setall ${isRowFilled(member.ma) ? 'clear-mode' : ''}" data-ma="${member.ma}" title="${isRowFilled(member.ma) ? 'נקה הכל' : 'מלא הכל'}">${isRowFilled(member.ma) ? '✕' : '▶'}</button></td>
@@ -2183,9 +2193,10 @@ function syncTotalsWithMainTable() {
 
     // Calculate the total width of fixed columns (for the label colspan cell)
     // Find the first date column (after all fixed columns)
-    let fixedColsCount = 11; // default
+    let fixedColsCount = 12; // default (includes notes column)
     if (skippedColumns.includes('mahlaka')) fixedColsCount--;
     if (skippedColumns.includes('miktzoaTzvai')) fixedColsCount--;
+    if (skippedColumns.includes('notes')) fixedColsCount--;
 
     const fixedColsWidth = columnWidths.slice(0, fixedColsCount).reduce((sum, w) => sum + w, 0);
 
@@ -2289,6 +2300,9 @@ function renderTotalRows(totalsTbody, dates, filteredMembers) {
     }
     if (!skippedColumns.includes('miktzoaTzvai')) {
         fixedColumns.push({ class: 'col-miktzoa', width: 80 });
+    }
+    if (!skippedColumns.includes('notes')) {
+        fixedColumns.push({ class: 'col-notes', width: 100 });
     }
 
     // Add dorech, yamam, setall columns
@@ -2753,7 +2767,7 @@ async function exportData() {
 
     // Header row
     const dates = generateDateRange();
-    const headers = [STRINGS.firstName, STRINGS.lastName, STRINGS.misparIshi, STRINGS.gdud, STRINGS.pluga, STRINGS.mahlaka];
+    const headers = [STRINGS.firstName, STRINGS.lastName, STRINGS.misparIshi, STRINGS.gdud, STRINGS.pluga, STRINGS.mahlaka, STRINGS.notes];
     dates.forEach(d => headers.push(formatDateDisplay(d)));
     exportRows.push(headers);
 
@@ -2765,7 +2779,8 @@ async function exportData() {
             member.ma,
             member.gdud || '',
             member.pluga || '',
-            member.mahlaka || ''
+            member.mahlaka || '',
+            member.notes || ''
         ];
         dates.forEach(date => {
             const dateStr = formatDate(date);
