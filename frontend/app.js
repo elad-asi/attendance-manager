@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.7.1';  // Notes column with show/hide button and auto-detection
+const FE_VERSION = '2.7.2';  // Fix HTML escaping for mahlaka values containing quotes
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -1684,8 +1684,10 @@ function renderUnitSelector() {
     sortedUnits.forEach(unit => {
         const data = unitData[unit];
         const isActive = activeUnitTabs.includes(unit) ? 'active' : '';
+        // Escape quotes in unit name for HTML attribute safety
+        const escapedUnit = unit.replace(/"/g, '&quot;');
         html += `
-            <div class="unit-card ${isActive}" data-unit="${unit}">
+            <div class="unit-card ${isActive}" data-unit="${escapedUnit}">
                 <div class="unit-card-name">${unit}</div>
                 <div class="unit-card-count">${data.count}</div>
                 <div class="unit-card-yamam">ימ"מ: ${data.yamam}</div>
@@ -1889,9 +1891,11 @@ function createFilterSelect(field, label) {
     values.forEach(val => {
         const checked = currentValues.includes(val) ? 'checked' : '';
         const displayVal = val === EMPTY_FILTER_VALUE ? 'ריק' : val;
+        // Escape quotes in value for HTML attribute safety
+        const escapedVal = val.replace(/"/g, '&quot;');
         checkboxes += `
             <label class="filter-checkbox-label">
-                <input type="checkbox" value="${val}" ${checked} onchange="handleFilterCheckboxChange('${field}', this)" />
+                <input type="checkbox" value="${escapedVal}" ${checked} onchange="handleFilterCheckboxChange('${field}', this)" />
                 ${displayVal}
             </label>`;
     });
