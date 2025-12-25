@@ -1,23 +1,35 @@
+import sys
+print("[STARTUP] Starting app.py imports...", file=sys.stderr, flush=True)
+
 from flask import Flask, request, jsonify, send_from_directory
+print("[STARTUP] Flask imported", file=sys.stderr, flush=True)
 from flask_cors import CORS
 import json
 import os
 import threading
 import time
 from datetime import datetime
+print("[STARTUP] Standard libs imported", file=sys.stderr, flush=True)
+
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+print("[STARTUP] Google libs imported", file=sys.stderr, flush=True)
+
 import local_cache as db  # Use local cache with Neon sync
+print("[STARTUP] local_cache imported", file=sys.stderr, flush=True)
 import cloud_backup
+print("[STARTUP] cloud_backup imported", file=sys.stderr, flush=True)
 import email_auth
+print("[STARTUP] email_auth imported", file=sys.stderr, flush=True)
 
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
+print("[STARTUP] Flask app created", file=sys.stderr, flush=True)
 
 # Version
-BE_VERSION = '2.6.3'  # Fix duplicate route causing Render crash
+BE_VERSION = '2.6.5'  # Add startup debug logging
 
 # NOTE: Using local SQLite for fast reads/writes with periodic Neon sync
 
