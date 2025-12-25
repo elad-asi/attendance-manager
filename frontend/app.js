@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.7.0';  // Add optional notes column
+const FE_VERSION = '2.7.1';  // Notes column with show/hide button and auto-detection
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -370,6 +370,7 @@ function initializeAppClean() {
 
     // Toggle column visibility
     document.getElementById('toggleMiktzoa').addEventListener('click', toggleMiktzoaColumn);
+    document.getElementById('toggleNotes').addEventListener('click', toggleNotesColumn);
 
     // Render empty table with "no data" message
     renderTable();
@@ -519,6 +520,7 @@ function initializeApp() {
 
     // Toggle column visibility
     document.getElementById('toggleMiktzoa').addEventListener('click', toggleMiktzoaColumn);
+    document.getElementById('toggleNotes').addEventListener('click', toggleNotesColumn);
 }
 
 // ============================================
@@ -878,7 +880,7 @@ function disconnectCurrentSheet() {
     localStorage.removeItem('current_sheet_info');
     localStorage.removeItem('skipped_columns');
     localStorage.removeItem('permanently_skipped_columns');
-    skippedColumns = ['miktzoaTzvai'];  // Default: hide miktzoaTzvai
+    skippedColumns = ['miktzoaTzvai', 'notes'];  // Default: hide miktzoaTzvai and notes
     permanentlySkippedColumns = [];
 
     // Also sign out from Google
@@ -916,15 +918,15 @@ async function loadFromBackend() {
         }
 
         // Load skipped columns preference (includes both permanent and user-toggled)
-        // Default: hide miktzoaTzvai column
+        // Default: hide miktzoaTzvai and notes columns
         const storedSkippedColumns = localStorage.getItem('skipped_columns');
         if (storedSkippedColumns) {
             const parsed = JSON.parse(storedSkippedColumns);
             // Use default if localStorage is empty array (fresh user)
-            skippedColumns = parsed.length > 0 ? parsed : ['miktzoaTzvai'];
+            skippedColumns = parsed.length > 0 ? parsed : ['miktzoaTzvai', 'notes'];
         } else {
             // No localStorage - use default
-            skippedColumns = ['miktzoaTzvai'];
+            skippedColumns = ['miktzoaTzvai', 'notes'];
         }
 
         // Check if we have a stored spreadsheet ID (Google Sheet ID is now the primary key)
@@ -970,6 +972,7 @@ async function loadFromBackend() {
         renderTable();
         updateSheetUI();
         updateToggleButtonState();
+        updateNotesToggleButtonState();
 
         // Collapse upload section if we have data
         if (teamMembers.length > 0) {
@@ -1304,8 +1307,8 @@ let pendingSheetData = null;
 let currentColumnMapping = {};
 
 // Skipped columns state (columns user chose to hide via toggle button)
-// Default: hide miktzoaTzvai (מקצוע צבאי)
-let skippedColumns = ['miktzoaTzvai'];
+// Default: hide miktzoaTzvai (מקצוע צבאי) and notes (הערות)
+let skippedColumns = ['miktzoaTzvai', 'notes'];
 
 // Permanently skipped columns (columns user chose to skip during mapping - no data loaded)
 let permanentlySkippedColumns = [];
@@ -1562,10 +1565,13 @@ async function confirmColumnMapping() {
         permanentlySkippedColumns = Object.keys(currentColumnMapping).filter(key => currentColumnMapping[key] === 'skip');
         localStorage.setItem('permanently_skipped_columns', JSON.stringify(permanentlySkippedColumns));
 
-        // Also set skippedColumns to include permanently skipped ones + default hidden (miktzoaTzvai)
+        // Also set skippedColumns to include permanently skipped ones + default hidden (miktzoaTzvai, notes)
         skippedColumns = [...permanentlySkippedColumns];
         if (!skippedColumns.includes('miktzoaTzvai')) {
             skippedColumns.push('miktzoaTzvai');
+        }
+        if (!skippedColumns.includes('notes')) {
+            skippedColumns.push('notes');
         }
         localStorage.setItem('skipped_columns', JSON.stringify(skippedColumns));
 
@@ -1583,6 +1589,7 @@ async function confirmColumnMapping() {
         renderTable();
         updateSheetUI();
         updateToggleButtonState();
+        updateNotesToggleButtonState();
 
         showSheetsStatus(`נטענו ${mappedMembers.length} חברי צוות בהצלחה!`, 'success');
 
@@ -2881,6 +2888,54 @@ function updateToggleButtonState() {
         btn.classList.add('hidden');
     } else {
         btn.textContent = 'הסתר מקצוע צבאי';
+        btn.classList.remove('hidden');
+    }
+}
+
+function toggleNotesColumn() {
+    const btn = document.getElementById('toggleNotes');
+    const isCurrentlyHidden = skippedColumns.includes('notes');
+
+    if (isCurrentlyHidden) {
+        // Show the column
+        skippedColumns = skippedColumns.filter(col => col !== 'notes');
+        btn.textContent = 'הסתר הערות';
+        btn.classList.remove('hidden');
+    } else {
+        // Hide the column
+        if (!skippedColumns.includes('notes')) {
+            skippedColumns.push('notes');
+        }
+        btn.textContent = 'הצג הערות';
+        btn.classList.add('hidden');
+    }
+
+    // Save preference to localStorage
+    localStorage.setItem('skipped_columns', JSON.stringify(skippedColumns));
+
+    // Re-render table
+    renderTable();
+}
+
+function updateNotesToggleButtonState() {
+    const btn = document.getElementById('toggleNotes');
+    if (!btn) return;
+
+    // If the column was permanently skipped during mapping, hide the button entirely
+    if (permanentlySkippedColumns.includes('notes')) {
+        btn.style.display = 'none';
+        return;
+    }
+
+    // Show the button
+    btn.style.display = '';
+
+    const isHidden = skippedColumns.includes('notes');
+    if (isHidden) {
+        btn.textContent = 'הצג הערות';
+        btn.classList.add('hidden');
+    } else {
+        btn.textContent = 'הסתר הערות';
         btn.classList.remove('hidden');
     }
 }

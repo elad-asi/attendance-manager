@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '2.5.6'  # Validate Google token on login
+BE_VERSION = '2.6.0'  # Add notes column auto-detection and parsing
 
 # NOTE: Using local SQLite for fast reads/writes with periodic Neon sync
 
@@ -302,6 +302,9 @@ def get_sheet_data():
             # Military profession/מקצוע צבאי detection
             elif 'מקצוע צבאי' in h_clean or 'מקצוע' in h_clean:
                 header_map['miktzoaTzvai'] = i
+            # Notes/הערות detection
+            elif 'הערות' in h_clean or h_lower == 'notes':
+                header_map['notes'] = i
 
         # Parse rows into team members
         members = []
@@ -325,7 +328,8 @@ def get_sheet_data():
                 'lastName': get_value('lastName', 1),
                 'ma': get_value('ma'),  # No default - must be found in headers
                 'mahlaka': get_value('mahlaka'),  # No default - must be found in headers
-                'miktzoaTzvai': get_value('miktzoaTzvai')  # Military profession
+                'miktzoaTzvai': get_value('miktzoaTzvai'),  # Military profession
+                'notes': get_value('notes')  # Notes/הערות
             }
 
             # Only add if we have at least a name or ma
