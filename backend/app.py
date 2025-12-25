@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '2.6.0'  # Add notes column auto-detection and parsing
+BE_VERSION = '2.6.1'  # Fix notes parsing in parse-with-mapping endpoint
 
 # NOTE: Using local SQLite for fast reads/writes with periodic Neon sync
 
@@ -416,7 +416,8 @@ def parse_sheet_with_mapping():
                 'lastName': get_value('lastName'),
                 'ma': get_value('ma'),
                 'mahlaka': get_value('mahlaka'),
-                'miktzoaTzvai': get_value('miktzoaTzvai')
+                'miktzoaTzvai': get_value('miktzoaTzvai'),
+                'notes': get_value('notes')
             }
 
             # Only add if we have at least firstName or lastName or ma
