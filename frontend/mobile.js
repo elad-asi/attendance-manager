@@ -141,7 +141,7 @@ async function verifyCode() {
     showStatus('מאמת...');
 
     try {
-        const response = await fetch(`${API_BASE}/auth/verify-code`, {
+        const response = await fetch(`${API_BASE}/auth/verify`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: currentUserEmail, code })
