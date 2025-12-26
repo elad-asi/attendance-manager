@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.7.2';  // Fix HTML escaping for mahlaka values containing quotes
+const FE_VERSION = '2.7.3';  // Add daily report export with date and unit selection
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -364,6 +364,12 @@ function initializeAppClean() {
     // Export
     document.getElementById('exportData').addEventListener('click', exportData);
 
+    // Daily report modal
+    document.getElementById('dailyReportBtn').addEventListener('click', openDailyReportModal);
+    document.getElementById('generateReportBtn').addEventListener('click', generateDailyReport);
+    document.getElementById('copyReportBtn').addEventListener('click', copyDailyReport);
+    document.getElementById('closeDailyReportBtn').addEventListener('click', closeDailyReportModal);
+
     // Column mapping modal buttons
     document.getElementById('confirmMappingBtn').addEventListener('click', confirmColumnMapping);
     document.getElementById('cancelMappingBtn').addEventListener('click', hideColumnMappingModal);
@@ -513,6 +519,12 @@ function initializeApp() {
 
     // Export
     document.getElementById('exportData').addEventListener('click', exportData);
+
+    // Daily report modal
+    document.getElementById('dailyReportBtn').addEventListener('click', openDailyReportModal);
+    document.getElementById('generateReportBtn').addEventListener('click', generateDailyReport);
+    document.getElementById('copyReportBtn').addEventListener('click', copyDailyReport);
+    document.getElementById('closeDailyReportBtn').addEventListener('click', closeDailyReportModal);
 
     // Column mapping modal buttons
     document.getElementById('confirmMappingBtn').addEventListener('click', confirmColumnMapping);
@@ -2820,6 +2832,183 @@ async function exportData() {
     // Download
     const filename = `attendance_${formatDate(new Date())}.xlsx`;
     XLSX.writeFile(wb, filename);
+}
+
+// ============================================
+// Daily Report Functions
+// ============================================
+
+function openDailyReportModal() {
+    const modal = document.getElementById('dailyReportModal');
+    const dateInput = document.getElementById('reportDate');
+    const unitSelect = document.getElementById('reportUnit');
+    const reportPreview = document.getElementById('reportPreview');
+    const copyBtn = document.getElementById('copyReportBtn');
+
+    // Set default date to today
+    dateInput.value = formatDate(new Date());
+
+    // Populate unit select with available units
+    const units = getUniqueValues('mahlaka', false);
+    unitSelect.innerHTML = '<option value="all">הכל (מקובץ לפי מחלקה)</option>';
+    units.forEach(unit => {
+        if (unit && unit !== EMPTY_FILTER_VALUE) {
+            // Escape quotes for HTML attribute safety
+            const escapedUnit = unit.replace(/"/g, '&quot;');
+            unitSelect.innerHTML += `<option value="${escapedUnit}">${unit}</option>`;
+        }
+    });
+
+    // Hide report preview initially
+    reportPreview.style.display = 'none';
+    copyBtn.style.display = 'none';
+
+    modal.style.display = 'flex';
+}
+
+function closeDailyReportModal() {
+    document.getElementById('dailyReportModal').style.display = 'none';
+}
+
+function generateDailyReport() {
+    const dateStr = document.getElementById('reportDate').value;
+    const selectedUnit = document.getElementById('reportUnit').value;
+    const reportPreview = document.getElementById('reportPreview');
+    const reportText = document.getElementById('reportText');
+    const copyBtn = document.getElementById('copyReportBtn');
+
+    if (!dateStr) {
+        alert('נא לבחור תאריך');
+        return;
+    }
+
+    // Format the date for display
+    const dateObj = new Date(dateStr);
+    const dayName = DAY_NAMES[dateObj.getDay()];
+    const formattedDate = `${dateObj.getDate()}/${dateObj.getMonth() + 1}/${dateObj.getFullYear()}`;
+
+    let report = '';
+    report += `דוח נוכחות יומי\n`;
+    report += `תאריך: ${formattedDate} (יום ${dayName})\n`;
+    report += `${'='.repeat(40)}\n\n`;
+
+    // Get members to include
+    let membersToReport = teamMembers;
+
+    if (selectedUnit === 'all') {
+        // Group by unit
+        const unitGroups = {};
+        membersToReport.forEach(member => {
+            const unit = member.mahlaka || 'ללא מחלקה';
+            if (!unitGroups[unit]) {
+                unitGroups[unit] = [];
+            }
+            unitGroups[unit].push(member);
+        });
+
+        // Sort units alphabetically, but put 'ללא מחלקה' last
+        const sortedUnits = Object.keys(unitGroups).sort((a, b) => {
+            if (a === 'ללא מחלקה') return 1;
+            if (b === 'ללא מחלקה') return -1;
+            return a.localeCompare(b, 'he');
+        });
+
+        sortedUnits.forEach(unit => {
+            report += generateUnitReport(unit, unitGroups[unit], dateStr);
+            report += '\n';
+        });
+    } else {
+        // Filter by selected unit
+        membersToReport = teamMembers.filter(m => (m.mahlaka || '') === selectedUnit);
+        report += generateUnitReport(selectedUnit, membersToReport, dateStr);
+    }
+
+    // Add summary
+    const totalPresent = countByStatus(membersToReport, dateStr, ['present', 'arriving']);
+    const totalAbsent = countByStatus(membersToReport, dateStr, ['absent']);
+    const totalCounted = countByStatus(membersToReport, dateStr, ['present', 'arriving', 'leaving', 'counted']);
+
+    report += `${'='.repeat(40)}\n`;
+    report += `סיכום כללי:\n`;
+    report += `סה"כ אנשים: ${membersToReport.length}\n`;
+    report += `נוכחים (דורך): ${totalPresent}\n`;
+    report += `נעדרים: ${totalAbsent}\n`;
+    report += `ימ"מ: ${totalCounted}\n`;
+
+    reportText.value = report;
+    reportPreview.style.display = 'block';
+    copyBtn.style.display = 'inline-block';
+}
+
+function generateUnitReport(unitName, members, dateStr) {
+    let report = `📌 ${unitName}\n`;
+    report += `${'-'.repeat(30)}\n`;
+
+    // Sort members by status, then by name
+    const sortedMembers = [...members].sort((a, b) => {
+        const statusA = getAttendanceStatus(a.ma, dateStr);
+        const statusB = getAttendanceStatus(b.ma, dateStr);
+        // Sort by status priority: present/arriving first, then others
+        const priorityA = ['present', 'arriving'].includes(statusA) ? 0 : 1;
+        const priorityB = ['present', 'arriving'].includes(statusB) ? 0 : 1;
+        if (priorityA !== priorityB) return priorityA - priorityB;
+        // Then sort by name
+        const nameA = `${a.firstName || ''} ${a.lastName || ''}`;
+        const nameB = `${b.firstName || ''} ${b.lastName || ''}`;
+        return nameA.localeCompare(nameB, 'he');
+    });
+
+    sortedMembers.forEach(member => {
+        const status = getAttendanceStatus(member.ma, dateStr);
+        const statusSymbol = STATUS_LABELS[status] || '-';
+        const statusText = getStatusText(status);
+        const name = `${member.firstName || ''} ${member.lastName || ''}`.trim();
+        report += `${statusSymbol} ${name} - ${statusText}\n`;
+    });
+
+    // Unit summary
+    const unitPresent = countByStatus(members, dateStr, ['present', 'arriving']);
+    const unitCounted = countByStatus(members, dateStr, ['present', 'arriving', 'leaving', 'counted']);
+    report += `\nסה"כ ${unitName}: ${members.length} | דורך: ${unitPresent} | ימ"מ: ${unitCounted}\n`;
+
+    return report;
+}
+
+function getAttendanceStatus(ma, dateStr) {
+    return (attendanceData[ma] && attendanceData[ma][dateStr]) || 'unmarked';
+}
+
+function getStatusText(status) {
+    const texts = {
+        'unmarked': 'לא סומן',
+        'present': 'נוכח',
+        'absent': 'נעדר',
+        'arriving': 'מגיע',
+        'leaving': 'עוזב',
+        'counted': 'נספר'
+    };
+    return texts[status] || status;
+}
+
+function countByStatus(members, dateStr, statusList) {
+    return members.filter(m => {
+        const status = getAttendanceStatus(m.ma, dateStr);
+        return statusList.includes(status);
+    }).length;
+}
+
+function copyDailyReport() {
+    const reportText = document.getElementById('reportText');
+    reportText.select();
+    document.execCommand('copy');
+
+    // Show feedback
+    const copyBtn = document.getElementById('copyReportBtn');
+    const originalText = copyBtn.textContent;
+    copyBtn.textContent = '✓ הועתק!';
+    setTimeout(() => {
+        copyBtn.textContent = originalText;
+    }, 2000);
 }
 
 // ============================================

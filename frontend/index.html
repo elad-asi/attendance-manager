@@ -136,6 +136,7 @@
                 <button id="toggleNotes" class="btn-toggle-col hidden">הצג הערות</button>
                 <button id="toggleMiktzoa" class="btn-toggle-col hidden">הצג מקצוע צבאי</button>
                 <button id="exportData" class="btn-export">📥 ייצוא נתונים</button>
+                <button id="dailyReportBtn" class="btn-export">📋 דוח יומי</button>
             </div>
         </section>
 
@@ -202,6 +203,39 @@
     <!-- Save Toast Notification -->
     <div id="saveToast" class="save-toast">נשמר בשרת</div>
 
+
+    <!-- Daily Report Modal -->
+    <div id="dailyReportModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content daily-report-modal">
+            <div class="modal-header">
+                <h2>📋 דוח יומי</h2>
+                <p class="modal-subtitle">בחר תאריך ומחלקה לדוח</p>
+            </div>
+            <div class="modal-body">
+                <div class="report-options">
+                    <div class="report-option-row">
+                        <label for="reportDate">תאריך:</label>
+                        <input type="date" id="reportDate" />
+                    </div>
+                    <div class="report-option-row">
+                        <label for="reportUnit">מחלקה:</label>
+                        <select id="reportUnit">
+                            <option value="all">הכל (מקובץ לפי מחלקה)</option>
+                            <!-- Units will be added dynamically -->
+                        </select>
+                    </div>
+                </div>
+                <div class="report-preview" id="reportPreview" style="display: none;">
+                    <textarea id="reportText" readonly></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="generateReportBtn" class="btn-confirm">צור דוח</button>
+                <button id="copyReportBtn" class="btn-confirm" style="display: none;">📋 העתק</button>
+                <button id="closeDailyReportBtn" class="btn-cancel">סגור</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Column Mapping Modal -->
     <div id="columnMappingModal" class="modal-overlay" style="display: none;">
