@@ -2884,7 +2884,8 @@ function generateDailyReport() {
 
     // Format the date for display
     const dateObj = new Date(dateStr);
-    const dayName = DAY_NAMES[dateObj.getDay()];
+    const hebrewDayNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+    const dayName = hebrewDayNames[dateObj.getDay()];
     const formattedDate = `${dateObj.getDate()}/${dateObj.getMonth() + 1}/${dateObj.getFullYear()}`;
 
     let report = '';
