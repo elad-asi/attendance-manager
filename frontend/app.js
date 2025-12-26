@@ -2961,10 +2961,9 @@ function generateUnitReport(unitName, members, dateStr) {
 
     sortedMembers.forEach(member => {
         const status = getAttendanceStatus(member.ma, dateStr);
-        const statusSymbol = STATUS_LABELS[status] || '-';
         const statusText = getStatusText(status);
         const name = `${member.firstName || ''} ${member.lastName || ''}`.trim();
-        report += `${statusSymbol} ${name} - ${statusText}\n`;
+        report += `${name} - ${statusText}\n`;
     });
 
     // Unit summary
@@ -2981,12 +2980,12 @@ function getAttendanceStatus(ma, dateStr) {
 
 function getStatusText(status) {
     const texts = {
-        'unmarked': 'לא סומן',
+        'unmarked': 'לא בשמ"פ',
         'present': 'נוכח',
-        'absent': 'נעדר',
+        'absent': 'לא בשמ"פ',
         'arriving': 'מגיע',
-        'leaving': 'עוזב',
-        'counted': 'נספר'
+        'leaving': 'יוצא',
+        'counted': 'בבית בשמ"פ'
     };
     return texts[status] || status;
 }
