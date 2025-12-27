@@ -77,10 +77,23 @@
             </div>
             <div class="upload-content">
 
+            <!-- Load from Database (no Google needed) -->
+            <div class="db-sheets-area">
+                <div class="sheets-header">
+                    <h3>📂 טעינה מהמאגר</h3>
+                    <button id="loadFromDbBtn" class="btn-load-db">בחר גיליון קיים</button>
+                </div>
+                <p class="upload-hint">טעינת גיליונות שכבר נשמרו במערכת - ללא צורך בחיבור ל-Google</p>
+            </div>
+
+            <div class="section-divider">
+                <span>או</span>
+            </div>
+
             <!-- Google Sheets Import -->
             <div class="google-sheets-area">
                 <div class="sheets-header">
-                    <h3>📊 ייבוא מ-Google Sheets</h3>
+                    <h3>📊 עדכון רשימה מ-Google Sheets</h3>
                     <div class="sheets-header-right">
                         <div class="user-info" id="userInfoDisplay" style="display: none;">
                             <span class="user-label">מחובר:</span>
@@ -203,6 +216,23 @@
     <!-- Save Toast Notification -->
     <div id="saveToast" class="save-toast">נשמר בשרת</div>
 
+    <!-- Database Sheets Selection Modal -->
+    <div id="dbSheetsModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content db-sheets-modal">
+            <div class="modal-header">
+                <h2>📂 בחירת גיליון מהמאגר</h2>
+                <p class="modal-subtitle">בחר גיליון קיים לטעינה</p>
+            </div>
+            <div class="modal-body">
+                <div class="db-sheets-list" id="dbSheetsList">
+                    <p class="loading-msg">טוען גיליונות...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="closeDbSheetsBtn" class="btn-cancel">סגור</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Daily Report Modal -->
     <div id="dailyReportModal" class="modal-overlay" style="display: none;">

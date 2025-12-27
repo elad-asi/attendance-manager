@@ -1829,6 +1829,111 @@ thead .col-setall {
     background: #5a6268;
 }
 
+/* Database Sheets Area */
+.db-sheets-area {
+    margin-bottom: 15px;
+}
+
+.db-sheets-area .sheets-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.btn-load-db {
+    background: linear-gradient(135deg, #28a745 0%, #20803a 100%);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-load-db:hover {
+    background: linear-gradient(135deg, #20803a 0%, #186a2e 100%);
+    transform: translateY(-2px);
+}
+
+.section-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 20px 0;
+    color: #888;
+}
+
+.section-divider::before,
+.section-divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.section-divider span {
+    padding: 0 15px;
+    font-size: 0.9rem;
+}
+
+/* Database Sheets Modal */
+.db-sheets-modal {
+    max-width: 500px;
+}
+
+.db-sheets-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.db-sheet-item {
+    padding: 15px;
+    background: #f8f9fa;
+    border: 2px solid #dee2e6;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.db-sheet-item:hover {
+    border-color: #28a745;
+    background: #f0fff4;
+}
+
+.db-sheet-item .sheet-title {
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: #2c3e50;
+    margin-bottom: 5px;
+}
+
+.db-sheet-item .sheet-info {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.db-sheet-item .sheet-dates {
+    font-size: 0.8rem;
+    color: #888;
+    margin-top: 5px;
+}
+
+.no-sheets-msg {
+    text-align: center;
+    padding: 30px;
+    color: #666;
+}
+
+.error-msg {
+    text-align: center;
+    padding: 30px;
+    color: #dc3545;
+    font-weight: 600;
+}
+
 /* Daily Report Modal */
 .daily-report-modal {
     max-width: 600px;

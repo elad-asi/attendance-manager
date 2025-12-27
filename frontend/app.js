@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.7.3';  // Add daily report export with date and unit selection
+const FE_VERSION = '2.8.0';  // Add direct database loading (no Google needed)
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -370,6 +370,10 @@ function initializeAppClean() {
     document.getElementById('copyReportBtn').addEventListener('click', copyDailyReport);
     document.getElementById('closeDailyReportBtn').addEventListener('click', closeDailyReportModal);
 
+    // Database sheets loading (no Google needed)
+    document.getElementById('loadFromDbBtn').addEventListener('click', openDbSheetsModal);
+    document.getElementById('closeDbSheetsBtn').addEventListener('click', closeDbSheetsModal);
+
     // Column mapping modal buttons
     document.getElementById('confirmMappingBtn').addEventListener('click', confirmColumnMapping);
     document.getElementById('cancelMappingBtn').addEventListener('click', hideColumnMappingModal);
@@ -525,6 +529,10 @@ function initializeApp() {
     document.getElementById('generateReportBtn').addEventListener('click', generateDailyReport);
     document.getElementById('copyReportBtn').addEventListener('click', copyDailyReport);
     document.getElementById('closeDailyReportBtn').addEventListener('click', closeDailyReportModal);
+
+    // Database sheets loading (no Google needed)
+    document.getElementById('loadFromDbBtn').addEventListener('click', openDbSheetsModal);
+    document.getElementById('closeDbSheetsBtn').addEventListener('click', closeDbSheetsModal);
 
     // Column mapping modal buttons
     document.getElementById('confirmMappingBtn').addEventListener('click', confirmColumnMapping);
@@ -3009,6 +3017,125 @@ function copyDailyReport() {
     setTimeout(() => {
         copyBtn.textContent = originalText;
     }, 2000);
+}
+
+// ============================================
+// Database Sheets Loading (No Google Connection)
+// ============================================
+
+async function openDbSheetsModal() {
+    const modal = document.getElementById('dbSheetsModal');
+    const listEl = document.getElementById('dbSheetsList');
+
+    // Show modal with loading message
+    listEl.innerHTML = '<p class="loading-msg">טוען גיליונות...</p>';
+    modal.style.display = 'flex';
+
+    try {
+        // Fetch available sheets from backend
+        const response = await fetch(`${API_BASE}/sheets`);
+        const sheets = await response.json();
+
+        if (!Array.isArray(sheets) || sheets.length === 0) {
+            listEl.innerHTML = '<p class="no-sheets-msg">אין גיליונות שמורים במאגר.<br>יש לטעון גיליון מ-Google Sheets תחילה.</p>';
+            return;
+        }
+
+        // Render sheets list
+        let html = '';
+        sheets.forEach(sheet => {
+            const title = sheet.spreadsheet_title || sheet.sheet_name || 'ללא שם';
+            const sheetName = sheet.sheet_name || '';
+            const gdud = sheet.gdud || '';
+            const pluga = sheet.pluga || '';
+            const info = [gdud, pluga].filter(Boolean).join(' / ');
+
+            html += `
+                <div class="db-sheet-item" onclick="loadSheetFromDb('${sheet.spreadsheet_id}')">
+                    <div class="sheet-title">${title}</div>
+                    ${sheetName ? `<div class="sheet-info">גיליון: ${sheetName}</div>` : ''}
+                    ${info ? `<div class="sheet-info">${info}</div>` : ''}
+                </div>
+            `;
+        });
+
+        listEl.innerHTML = html;
+
+    } catch (error) {
+        console.error('Error fetching sheets from database:', error);
+        listEl.innerHTML = '<p class="error-msg">שגיאה בטעינת גיליונות מהמאגר</p>';
+    }
+}
+
+function closeDbSheetsModal() {
+    document.getElementById('dbSheetsModal').style.display = 'none';
+}
+
+async function loadSheetFromDb(spreadsheetId) {
+    closeDbSheetsModal();
+
+    // Show loading state
+    const sheetsStatus = document.getElementById('sheetsStatus');
+    sheetsStatus.innerHTML = '<span class="loading">טוען נתונים מהמאגר...</span>';
+
+    try {
+        // Fetch sheet data from backend
+        const response = await fetch(`${API_BASE}/sheets/${spreadsheetId}`);
+        const data = await response.json();
+
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
+        // Store current sheet info
+        currentSpreadsheetId = spreadsheetId;
+        currentSpreadsheetTitle = data.sheet?.spreadsheet_title || 'ללא שם';
+        currentSheetName = data.sheet?.sheet_name || '';
+
+        // Update team members and attendance data
+        teamMembers = data.teamMembers || [];
+        attendanceData = data.attendanceData || {};
+
+        // Update date range if available from sheet
+        if (data.sheet?.start_date) {
+            startDate = new Date(data.sheet.start_date);
+            document.getElementById('startDate').value = data.sheet.start_date;
+        }
+        if (data.sheet?.end_date) {
+            endDate = new Date(data.sheet.end_date);
+            document.getElementById('endDate').value = data.sheet.end_date;
+        }
+
+        // Update sheet info display
+        document.getElementById('spreadsheetTitle').textContent = currentSpreadsheetTitle;
+        document.getElementById('sheetNameDisplay').textContent = currentSheetName || '-';
+        document.getElementById('spreadsheetIdDisplay').textContent = spreadsheetId;
+        document.getElementById('sheetInfoDisplay').style.display = 'flex';
+
+        // Collapse the upload section
+        const uploadContent = document.querySelector('.upload-content');
+        const toggleIcon = document.querySelector('.toggle-icon');
+        if (uploadContent) {
+            uploadContent.classList.add('collapsed');
+            if (toggleIcon) toggleIcon.textContent = '▶';
+        }
+
+        // Render the table
+        renderTable();
+
+        // Show unit selector if there are units
+        renderUnitSelector();
+
+        // Start polling for updates
+        startPolling();
+
+        sheetsStatus.innerHTML = `<span class="success">נטען מהמאגר: ${currentSpreadsheetTitle}</span>`;
+        showSaveToast(`נטענו ${teamMembers.length} חברי צוות`);
+
+    } catch (error) {
+        console.error('Error loading sheet from database:', error);
+        sheetsStatus.innerHTML = `<span class="error">שגיאה בטעינה: ${error.message}</span>`;
+    }
 }
 
 // ============================================

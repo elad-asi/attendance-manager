@@ -2,7 +2,7 @@
 // Attendance Manager - Mobile JavaScript
 // ============================================
 
-const MOBILE_VERSION = '2.9.1';
+const MOBILE_VERSION = '2.9.2';
 
 // API Base URL
 const API_BASE = '/api';
@@ -268,7 +268,7 @@ async function loadData() {
         }
 
         // Load data from backend
-        const response = await fetch(`${API_BASE}/sheets/${currentSpreadsheetId}/load`);
+        const response = await fetch(`${API_BASE}/sheets/${currentSpreadsheetId}`);
         const data = await response.json();
 
         if (data.error) {
