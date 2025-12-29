@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.8.0';  // Add direct database loading (no Google needed)
+const FE_VERSION = '2.8.1';  // Add notes to daily report
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -2971,7 +2971,8 @@ function generateUnitReport(unitName, members, dateStr) {
         const status = getAttendanceStatus(member.ma, dateStr);
         const statusText = getStatusText(status);
         const name = `${member.firstName || ''} ${member.lastName || ''}`.trim();
-        report += `${name} - ${statusText}\n`;
+        const notes = member.notes ? ` (${member.notes})` : '';
+        report += `${name} - ${statusText}${notes}\n`;
     });
 
     // Unit summary
