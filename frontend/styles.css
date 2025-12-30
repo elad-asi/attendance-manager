@@ -1323,6 +1323,13 @@ thead .col-setall {
     color: #721c24;
 }
 
+/* Gimel/ג' - orange background */
+.attendance-cell.gimel {
+    background: #ffe0b2 !important;
+    color: #e65100;
+    font-weight: 700;
+}
+
 /* Unmarked - keep weekend background for unmarked cells */
 .attendance-cell.unmarked {
     background: #f8f9fa;

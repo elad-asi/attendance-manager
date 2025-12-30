@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.8.2';  // Add offline notification bar
+const FE_VERSION = '2.8.3';  // Add gimel (ג') attendance status
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -76,14 +76,15 @@ const GOOGLE_CLIENT_ID = '651831609522-bvrgmop9hmdghlrn2tqm1hv0dmkhu933.apps.goo
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email';
 
 // Attendance statuses
-const STATUSES = ['unmarked', 'present', 'absent', 'arriving', 'leaving', 'counted'];
+const STATUSES = ['unmarked', 'present', 'absent', 'arriving', 'leaving', 'counted', 'gimel'];
 const STATUS_LABELS = {
     'unmarked': '',
     'present': '✓',
     'absent': '✗',
     'arriving': '+',
     'leaving': '-',
-    'counted': '○'
+    'counted': '○',
+    'gimel': 'ג'
 };
 
 // Hebrew tooltips for each status
@@ -93,14 +94,15 @@ const STATUS_TOOLTIPS = {
     'absent': 'נעדר (✗)',
     'arriving': 'מגיע (+)',
     'leaving': 'יוצא (-)',
-    'counted': 'חופש (○)'
+    'counted': 'חופש (○)',
+    'gimel': 'ג\' (ג)'
 };
 
 // Define which statuses count for each total
 const TOTALS_CONFIG = {
     mission: ['present', 'arriving'],
     includeLeave: ['present', 'arriving', 'leaving'],
-    counted: ['present', 'arriving', 'leaving', 'counted']
+    counted: ['present', 'arriving', 'leaving', 'counted', 'gimel']
 };
 
 // Hebrew strings
@@ -2994,7 +2996,8 @@ function getStatusText(status) {
         'absent': 'לא בשמ"פ',
         'arriving': 'מגיע',
         'leaving': 'יוצא',
-        'counted': 'בבית בשמ"פ'
+        'counted': 'בבית בשמ"פ',
+        'gimel': 'ג\''
     };
     return texts[status] || status;
 }
