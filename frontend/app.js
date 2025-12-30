@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.8.3';  // Add gimel (ג') attendance status
+const FE_VERSION = '2.8.4';  // Add gimel to legend
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds

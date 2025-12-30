@@ -1483,6 +1483,11 @@ thead .col-setall {
     border: 2px solid #721c24;
 }
 
+.status-box.gimel {
+    background: #ffe0b2;
+    border: 2px solid #e65100;
+}
+
 .status-box.unmarked {
     background: #f8f9fa;
     border: 2px solid #adb5bd;
