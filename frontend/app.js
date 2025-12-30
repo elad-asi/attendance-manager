@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.8.4';  // Add gimel to legend
+const FE_VERSION = '2.8.5';  // Add gimel to status cycle transitions
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -2437,13 +2437,16 @@ function getAllowedStatuses(ma, date) {
             return ['unmarked', 'absent', 'arriving'];
         case 'arriving':
             // After arriving, any status is allowed
-            return ['unmarked', 'present', 'absent', 'arriving', 'leaving', 'counted'];
+            return ['unmarked', 'present', 'absent', 'arriving', 'leaving', 'counted', 'gimel'];
         case 'leaving':
-            // After leaving: counted (vacation), absent, or arriving again
-            return ['unmarked', 'counted', 'absent', 'arriving'];
+            // After leaving: counted (vacation), gimel, absent, or arriving again
+            return ['unmarked', 'counted', 'gimel', 'absent', 'arriving'];
         case 'counted':
-            // After counted (vacation): can stay counted or arrive back
-            return ['unmarked', 'counted', 'arriving'];
+            // After counted (vacation): can stay counted, switch to gimel, or arrive back
+            return ['unmarked', 'counted', 'gimel', 'arriving'];
+        case 'gimel':
+            // After gimel: can stay gimel, switch to counted, or arrive back
+            return ['unmarked', 'gimel', 'counted', 'arriving'];
         default:
             return ['unmarked', 'arriving'];
     }
