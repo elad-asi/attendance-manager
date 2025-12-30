@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.8.5';  // Add gimel to status cycle transitions
+const FE_VERSION = '2.8.6';  // Include gimel in daily report ימ"מ count
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -2940,7 +2940,7 @@ function generateDailyReport() {
     // Add summary
     const totalPresent = countByStatus(membersToReport, dateStr, ['present', 'arriving']);
     const totalAbsent = countByStatus(membersToReport, dateStr, ['absent']);
-    const totalCounted = countByStatus(membersToReport, dateStr, ['present', 'arriving', 'leaving', 'counted']);
+    const totalCounted = countByStatus(membersToReport, dateStr, ['present', 'arriving', 'leaving', 'counted', 'gimel']);
 
     report += `${'='.repeat(40)}\n`;
     report += `סיכום כללי:\n`;
@@ -2982,7 +2982,7 @@ function generateUnitReport(unitName, members, dateStr) {
 
     // Unit summary
     const unitPresent = countByStatus(members, dateStr, ['present', 'arriving']);
-    const unitCounted = countByStatus(members, dateStr, ['present', 'arriving', 'leaving', 'counted']);
+    const unitCounted = countByStatus(members, dateStr, ['present', 'arriving', 'leaving', 'counted', 'gimel']);
     report += `\nסה"כ ${unitName}: ${members.length} | דורך: ${unitPresent} | ימ"מ: ${unitCounted}\n`;
 
     return report;
