@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.8.1';  // Add notes to daily report
+const FE_VERSION = '2.8.2';  // Add offline notification bar
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -3263,10 +3263,39 @@ function updateNotesToggleButtonState() {
 
 
 // ============================================
+// Offline Detection
+// ============================================
+
+function updateOfflineStatus() {
+    const offlineBar = document.getElementById('offlineBar');
+    if (!offlineBar) return;
+
+    if (!navigator.onLine) {
+        offlineBar.style.display = 'flex';
+        document.body.classList.add('is-offline');
+    } else {
+        offlineBar.style.display = 'none';
+        document.body.classList.remove('is-offline');
+    }
+}
+
+function initializeOfflineDetection() {
+    // Check initial status
+    updateOfflineStatus();
+
+    // Listen for online/offline events
+    window.addEventListener('online', updateOfflineStatus);
+    window.addEventListener('offline', updateOfflineStatus);
+}
+
+// ============================================
 // Event Listeners
 // ============================================
 
 document.addEventListener('DOMContentLoaded', async function() {
+    // Initialize offline detection
+    initializeOfflineDetection();
+
     // Always initialize login listeners
     initializeLoginListeners();
 
