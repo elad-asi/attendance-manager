@@ -372,7 +372,7 @@ def get_full_sheet_data(spreadsheet_id):
 
     # Get team members
     cursor.execute('''
-        SELECT first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai
+        SELECT first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai, notes
         FROM team_members WHERE spreadsheet_id = %s
     ''', (spreadsheet_id,))
     member_rows = cursor.fetchall()
@@ -386,7 +386,8 @@ def get_full_sheet_data(spreadsheet_id):
             'gdud': row['gdud'],
             'pluga': row['pluga'],
             'mahlaka': row['mahlaka'],
-            'miktzoaTzvai': row.get('miktzoa_tzvai', '')
+            'miktzoaTzvai': row.get('miktzoa_tzvai', ''),
+            'notes': row.get('notes', '')
         })
 
     # Get attendance

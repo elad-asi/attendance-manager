@@ -132,10 +132,17 @@ def init_local_cache():
                 pluga TEXT DEFAULT '',
                 mahlaka TEXT DEFAULT '',
                 miktzoa_tzvai TEXT DEFAULT '',
+                notes TEXT DEFAULT '',
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (spreadsheet_id) REFERENCES sheets(spreadsheet_id) ON DELETE CASCADE
             )
         ''')
+
+        # Add notes column if it doesn't exist (migration for existing DBs)
+        try:
+            cursor.execute('ALTER TABLE team_members ADD COLUMN notes TEXT DEFAULT ""')
+        except:
+            pass  # Column already exists
 
         # Attendance table
         cursor.execute('''
@@ -210,12 +217,12 @@ def pull_from_neon():
             members = neon_cursor.fetchall()
             for m in members:
                 local_cursor.execute('''
-                    INSERT INTO team_members (spreadsheet_id, first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO team_members (spreadsheet_id, first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai, notes, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     m['spreadsheet_id'], m.get('first_name', ''), m.get('last_name', ''),
                     m.get('ma', ''), m.get('gdud', ''), m.get('pluga', ''),
-                    m.get('mahlaka', ''), m.get('miktzoa_tzvai', ''), m.get('created_at', '')
+                    m.get('mahlaka', ''), m.get('miktzoa_tzvai', ''), m.get('notes', ''), m.get('created_at', '')
                 ))
 
             # Pull attendance
@@ -286,13 +293,13 @@ def push_pending_to_neon():
                 cursor.execute('DELETE FROM team_members WHERE spreadsheet_id = %s', (spreadsheet_id,))
                 for member in members:
                     cursor.execute('''
-                        INSERT INTO team_members (spreadsheet_id, first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        INSERT INTO team_members (spreadsheet_id, first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai, notes)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ''', (
                         spreadsheet_id,
                         member.get('firstName', ''), member.get('lastName', ''), member.get('ma', ''),
                         member.get('gdud', ''), member.get('pluga', ''),
-                        member.get('mahlaka', ''), member.get('miktzoaTzvai', '')
+                        member.get('mahlaka', ''), member.get('miktzoaTzvai', ''), member.get('notes', '')
                     ))
             print(f"[SYNC] Pushed team members for {len(pending_team_members)} sheets to Neon")
 
@@ -473,13 +480,13 @@ def save_team_members(spreadsheet_id, members):
         cursor.execute('DELETE FROM team_members WHERE spreadsheet_id = ?', (spreadsheet_id,))
         for member in members:
             cursor.execute('''
-                INSERT INTO team_members (spreadsheet_id, first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO team_members (spreadsheet_id, first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 spreadsheet_id,
                 member.get('firstName', ''), member.get('lastName', ''), member.get('ma', ''),
                 member.get('gdud', ''), member.get('pluga', ''),
-                member.get('mahlaka', ''), member.get('miktzoaTzvai', '')
+                member.get('mahlaka', ''), member.get('miktzoaTzvai', ''), member.get('notes', '')
             ))
 
     # Queue for background Neon sync (no blocking!)
@@ -585,7 +592,7 @@ def get_full_sheet_data(spreadsheet_id):
 
         # Get team members
         cursor.execute('''
-            SELECT first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai
+            SELECT first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai, notes
             FROM team_members WHERE spreadsheet_id = ?
         ''', (spreadsheet_id,))
         member_rows = cursor.fetchall()
@@ -599,7 +606,8 @@ def get_full_sheet_data(spreadsheet_id):
                 'gdud': row['gdud'],
                 'pluga': row['pluga'],
                 'mahlaka': row['mahlaka'],
-                'miktzoaTzvai': row['miktzoa_tzvai'] or ''
+                'miktzoaTzvai': row['miktzoa_tzvai'] or '',
+                'notes': row['notes'] or '' if 'notes' in row.keys() else ''
             })
 
         # Get attendance
