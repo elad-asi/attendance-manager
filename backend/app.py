@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '2.8.11'  # Add debug test-sync endpoint
+BE_VERSION = '2.8.12'  # Fix debug test-sync endpoint
 
 # NOTE: Using local SQLite for fast reads/writes with periodic Neon sync
 
@@ -494,15 +494,9 @@ def force_sync():
 def test_sync():
     """Test sync to Neon and return any errors"""
     try:
-        # Try to get Neon connection
-        import psycopg2
-        from psycopg2.extras import RealDictCursor
-        neon_url = os.environ.get('DATABASE_URL')
-        if not neon_url:
-            return jsonify({'error': 'No DATABASE_URL set'})
-
-        conn = psycopg2.connect(neon_url, cursor_factory=RealDictCursor)
-        cursor = conn.cursor()
+        # Use db module's connection (connects to Neon)
+        conn = db.get_db_connection()
+        cursor = db.get_dict_cursor(conn)
 
         # Check team_members columns
         cursor.execute("""
@@ -511,11 +505,16 @@ def test_sync():
         """)
         columns = [row['column_name'] for row in cursor.fetchall()]
 
+        # Count team members with notes
+        cursor.execute("SELECT COUNT(*) as cnt FROM team_members WHERE notes IS NOT NULL AND notes != ''")
+        notes_count = cursor.fetchone()['cnt']
+
         conn.close()
         return jsonify({
             'success': True,
             'team_members_columns': columns,
-            'has_notes': 'notes' in columns
+            'has_notes': 'notes' in columns,
+            'members_with_notes': notes_count
         })
     except Exception as e:
         return jsonify({'error': str(e)})
