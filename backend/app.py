@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '2.8.13'  # Use Neon connection in test-sync
+BE_VERSION = '2.8.14'  # Fix migrate to use Neon connection
 
 # NOTE: Using local SQLite for fast reads/writes with periodic Neon sync
 
@@ -526,11 +526,12 @@ def test_sync():
 
 @app.route('/api/migrate', methods=['POST', 'GET'])
 def run_migration():
-    """Run database migrations - add notes column to team_members"""
-    conn = db.get_db_connection()
+    """Run database migrations on NEON - add notes column to team_members"""
+    # Use Neon connection, not local SQLite!
+    conn = db.get_neon_connection()
     cursor = conn.cursor()
 
-    result = {'migrations': []}
+    result = {'migrations': [], 'database': 'neon'}
 
     # Migration 1: Add notes column to team_members
     try:
