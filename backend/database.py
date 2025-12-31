@@ -133,10 +133,17 @@ def init_database():
             pluga TEXT DEFAULT '',
             mahlaka TEXT DEFAULT '',
             miktzoa_tzvai TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (spreadsheet_id) REFERENCES sheets(spreadsheet_id) ON DELETE CASCADE
         )
     ''')
+
+    # Add notes column if it doesn't exist (for existing databases)
+    try:
+        cursor.execute('ALTER TABLE team_members ADD COLUMN notes TEXT DEFAULT ""')
+    except:
+        pass  # Column already exists
 
     # Attendance table - linked directly to spreadsheet_id
     cursor.execute('''
@@ -238,8 +245,8 @@ def save_team_members(spreadsheet_id, members):
     # Insert new members
     for member in members:
         cursor.execute('''
-            INSERT INTO team_members (spreadsheet_id, first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO team_members (spreadsheet_id, first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai, notes)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         ''', (
             spreadsheet_id,
             member.get('firstName', ''),
@@ -248,7 +255,8 @@ def save_team_members(spreadsheet_id, members):
             member.get('gdud', ''),
             member.get('pluga', ''),
             member.get('mahlaka', ''),
-            member.get('miktzoaTzvai', '')
+            member.get('miktzoaTzvai', ''),
+            member.get('notes', '')
         ))
 
     conn.commit()
@@ -259,7 +267,7 @@ def get_team_members(spreadsheet_id):
     conn = get_db_connection()
     cursor = get_dict_cursor(conn)
     cursor.execute('''
-        SELECT first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai
+        SELECT first_name, last_name, ma, gdud, pluga, mahlaka, miktzoa_tzvai, notes
         FROM team_members WHERE spreadsheet_id = %s
     ''', (spreadsheet_id,))
     rows = cursor.fetchall()
@@ -274,7 +282,8 @@ def get_team_members(spreadsheet_id):
             'gdud': row['gdud'],
             'pluga': row['pluga'],
             'mahlaka': row['mahlaka'],
-            'miktzoaTzvai': row.get('miktzoa_tzvai', '')
+            'miktzoaTzvai': row.get('miktzoa_tzvai', ''),
+            'notes': row.get('notes', '')
         })
     return members
 
