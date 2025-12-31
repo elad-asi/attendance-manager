@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '2.8.9'  # Fix notes in local cache
+BE_VERSION = '2.8.10'  # Add notes migration for Neon
 
 # NOTE: Using local SQLite for fast reads/writes with periodic Neon sync
 
@@ -492,30 +492,33 @@ def force_sync():
 
 @app.route('/api/migrate', methods=['POST', 'GET'])
 def run_migration():
-    """Run database migrations - add updated_by_session column"""
+    """Run database migrations - add notes column to team_members"""
     conn = db.get_db_connection()
     cursor = conn.cursor()
 
-    # Check current columns
-    cursor.execute("PRAGMA table_info(attendance)")
-    columns = [col['name'] for col in cursor.fetchall()]
+    result = {'migrations': []}
 
-    result = {'columns_before': columns}
+    # Migration 1: Add notes column to team_members
+    try:
+        cursor.execute('ALTER TABLE team_members ADD COLUMN notes TEXT DEFAULT \'\'')
+        conn.commit()
+        result['migrations'].append('Added notes column to team_members')
+    except Exception as e:
+        if 'already exists' in str(e).lower() or 'duplicate' in str(e).lower():
+            result['migrations'].append('notes column already exists')
+        else:
+            result['migrations'].append(f'notes migration error: {str(e)}')
 
-    if 'updated_by_session' not in columns:
-        try:
-            cursor.execute('ALTER TABLE attendance ADD COLUMN updated_by_session TEXT DEFAULT ""')
-            conn.commit()
-            result['migration'] = 'Added updated_by_session column'
-        except Exception as e:
-            result['migration_error'] = str(e)
-    else:
-        result['migration'] = 'Column already exists'
-
-    # Check columns after
-    cursor.execute("PRAGMA table_info(attendance)")
-    columns_after = [col['name'] for col in cursor.fetchall()]
-    result['columns_after'] = columns_after
+    # Migration 2: Add updated_by_session to attendance (if not exists)
+    try:
+        cursor.execute('ALTER TABLE attendance ADD COLUMN updated_by_session TEXT DEFAULT \'\'')
+        conn.commit()
+        result['migrations'].append('Added updated_by_session column to attendance')
+    except Exception as e:
+        if 'already exists' in str(e).lower() or 'duplicate' in str(e).lower():
+            result['migrations'].append('updated_by_session column already exists')
+        else:
+            result['migrations'].append(f'updated_by_session migration error: {str(e)}')
 
     conn.close()
     return jsonify(result)
