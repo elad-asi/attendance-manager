@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.8.8';  // Save notes to database
+const FE_VERSION = '2.8.9';  // Show notes count in load message
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -1613,7 +1613,10 @@ async function confirmColumnMapping() {
         updateToggleButtonState();
         updateNotesToggleButtonState();
 
-        showSheetsStatus(`נטענו ${mappedMembers.length} חברי צוות בהצלחה!`, 'success');
+        // Count members with notes
+        const notesCount = mappedMembers.filter(m => m.notes && m.notes.trim()).length;
+        const notesText = notesCount > 0 ? ` (${notesCount} עם הערות)` : '';
+        showSheetsStatus(`נטענו ${mappedMembers.length} חברי צוות בהצלחה!${notesText}`, 'success');
 
         // Collapse the upload section after successful load
         collapseUploadSection();
@@ -3129,8 +3132,11 @@ async function loadSheetFromDb(spreadsheetId) {
         // Start polling for updates
         startPolling();
 
+        // Count members with notes
+        const notesCount = teamMembers.filter(m => m.notes && m.notes.trim()).length;
+        const notesText = notesCount > 0 ? ` (${notesCount} עם הערות)` : '';
         sheetsStatus.innerHTML = `<span class="success">נטען מהמאגר: ${currentSpreadsheetTitle}</span>`;
-        showSaveToast(`נטענו ${teamMembers.length} חברי צוות`);
+        showSaveToast(`נטענו ${teamMembers.length} חברי צוות${notesText}`);
 
     } catch (error) {
         console.error('Error loading sheet from database:', error);
