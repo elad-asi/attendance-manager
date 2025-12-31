@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.8.6';  // Include gimel in daily report ימ"מ count
+const FE_VERSION = '2.8.7';  // Sort daily report alphabetically
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -2958,15 +2958,8 @@ function generateUnitReport(unitName, members, dateStr) {
     let report = `📌 ${unitName}\n`;
     report += `${'-'.repeat(30)}\n`;
 
-    // Sort members by status, then by name
+    // Sort members alphabetically by name
     const sortedMembers = [...members].sort((a, b) => {
-        const statusA = getAttendanceStatus(a.ma, dateStr);
-        const statusB = getAttendanceStatus(b.ma, dateStr);
-        // Sort by status priority: present/arriving first, then others
-        const priorityA = ['present', 'arriving'].includes(statusA) ? 0 : 1;
-        const priorityB = ['present', 'arriving'].includes(statusB) ? 0 : 1;
-        if (priorityA !== priorityB) return priorityA - priorityB;
-        // Then sort by name
         const nameA = `${a.firstName || ''} ${a.lastName || ''}`;
         const nameB = `${b.firstName || ''} ${b.lastName || ''}`;
         return nameA.localeCompare(nameB, 'he');
