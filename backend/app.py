@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '2.6.6'  # Fix mobile auth endpoint
+BE_VERSION = '2.8.8'  # Save notes to database
 
 # NOTE: Using local SQLite for fast reads/writes with periodic Neon sync
 
