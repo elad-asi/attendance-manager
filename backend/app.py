@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '2.8.14'  # Fix migrate to use Neon connection
+BE_VERSION = '3.0.0'  # Google OAuth verification ready
 
 # NOTE: Using local SQLite for fast reads/writes with periodic Neon sync
 

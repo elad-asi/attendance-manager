@@ -2515,12 +2515,46 @@ thead .col-setall {
 
 .login-header h1 {
     font-size: 2rem;
-    margin-bottom: 8px;
+    margin-bottom: 5px;
+}
+
+.login-header h2 {
+    font-size: 1.3rem;
+    margin-bottom: 10px;
+    opacity: 0.9;
 }
 
 .login-header p {
     opacity: 0.85;
     font-size: 1rem;
+}
+
+.login-header .app-description {
+    font-size: 0.9rem;
+    opacity: 0.8;
+    margin-top: 10px;
+    line-height: 1.5;
+}
+
+.login-footer {
+    padding: 15px 30px;
+    text-align: center;
+    border-top: 1px solid #eee;
+    font-size: 0.85rem;
+}
+
+.login-footer a {
+    color: #667eea;
+    text-decoration: none;
+}
+
+.login-footer a:hover {
+    text-decoration: underline;
+}
+
+.login-footer span {
+    margin: 0 10px;
+    color: #ccc;
 }
 
 .login-step {

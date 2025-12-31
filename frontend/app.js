@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.8.9';  // Show notes count in load message
+const FE_VERSION = '3.0.0';  // Google OAuth verification ready
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
