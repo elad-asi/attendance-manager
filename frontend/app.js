@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '2.8.7';  // Sort daily report alphabetically
+const FE_VERSION = '2.8.8';  // Save notes to database
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
