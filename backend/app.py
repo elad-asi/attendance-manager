@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '2.8.12'  # Fix debug test-sync endpoint
+BE_VERSION = '2.8.13'  # Use Neon connection in test-sync
 
 # NOTE: Using local SQLite for fast reads/writes with periodic Neon sync
 
@@ -494,9 +494,9 @@ def force_sync():
 def test_sync():
     """Test sync to Neon and return any errors"""
     try:
-        # Use db module's connection (connects to Neon)
-        conn = db.get_db_connection()
-        cursor = db.get_dict_cursor(conn)
+        # Use local_cache's Neon connection
+        conn = db.get_neon_connection()
+        cursor = db.get_neon_dict_cursor(conn)
 
         # Check team_members columns
         cursor.execute("""
@@ -505,16 +505,21 @@ def test_sync():
         """)
         columns = [row['column_name'] for row in cursor.fetchall()]
 
-        # Count team members with notes
+        # Count team members with notes in Neon
         cursor.execute("SELECT COUNT(*) as cnt FROM team_members WHERE notes IS NOT NULL AND notes != ''")
         notes_count = cursor.fetchone()['cnt']
+
+        # Total members in Neon
+        cursor.execute("SELECT COUNT(*) as cnt FROM team_members")
+        total_count = cursor.fetchone()['cnt']
 
         conn.close()
         return jsonify({
             'success': True,
-            'team_members_columns': columns,
-            'has_notes': 'notes' in columns,
-            'members_with_notes': notes_count
+            'neon_team_members_columns': columns,
+            'has_notes_column': 'notes' in columns,
+            'neon_members_with_notes': notes_count,
+            'neon_total_members': total_count
         })
     except Exception as e:
         return jsonify({'error': str(e)})
