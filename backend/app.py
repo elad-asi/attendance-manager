@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '2.8.10'  # Add notes migration for Neon
+BE_VERSION = '2.8.11'  # Add debug test-sync endpoint
 
 # NOTE: Using local SQLite for fast reads/writes with periodic Neon sync
 
@@ -489,6 +489,36 @@ def force_sync():
     """Force immediate sync to Neon"""
     db.force_sync_now()
     return jsonify({'success': True, 'pendingCount': db.get_pending_sync_count()})
+
+@app.route('/api/debug/test-sync', methods=['GET'])
+def test_sync():
+    """Test sync to Neon and return any errors"""
+    try:
+        # Try to get Neon connection
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        neon_url = os.environ.get('DATABASE_URL')
+        if not neon_url:
+            return jsonify({'error': 'No DATABASE_URL set'})
+
+        conn = psycopg2.connect(neon_url, cursor_factory=RealDictCursor)
+        cursor = conn.cursor()
+
+        # Check team_members columns
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'team_members'
+        """)
+        columns = [row['column_name'] for row in cursor.fetchall()]
+
+        conn.close()
+        return jsonify({
+            'success': True,
+            'team_members_columns': columns,
+            'has_notes': 'notes' in columns
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)})
 
 @app.route('/api/migrate', methods=['POST', 'GET'])
 def run_migration():
