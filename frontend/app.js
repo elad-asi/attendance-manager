@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '3.0.0';  // Google OAuth verification ready
+const FE_VERSION = '3.0.1';  // Fix search input focus issue
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -2281,7 +2281,8 @@ function attachHeaderSearchListeners() {
     document.querySelectorAll('.header-search-input').forEach(input => {
         input.addEventListener('input', function() {
             const field = this.dataset.searchField;
-            const value = this.value.trim();
+            const value = this.value;  // Don't trim - preserve spaces while typing
+            const cursorPos = this.selectionStart;
 
             // Clear previous timeout
             if (headerSearchTimeout) {
@@ -2290,9 +2291,17 @@ function attachHeaderSearchListeners() {
 
             // Debounce the search
             headerSearchTimeout = setTimeout(() => {
-                searchFilters[field] = value;
+                searchFilters[field] = value.trim();
                 renderTable();
-            }, 200);
+
+                // Restore focus and cursor position after render
+                const newInput = document.querySelector(`.header-search-input[data-search-field="${field}"]`);
+                if (newInput) {
+                    newInput.focus();
+                    newInput.value = value;  // Set untrimmed value
+                    newInput.setSelectionRange(cursorPos, cursorPos);
+                }
+            }, 300);
         });
 
         // Clear on Escape key
