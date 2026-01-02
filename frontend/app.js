@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '3.0.1';  // Fix search input focus issue
+const FE_VERSION = '3.0.2';  // Add dorech filter to daily report
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -2898,6 +2898,7 @@ function closeDailyReportModal() {
 function generateDailyReport() {
     const dateStr = document.getElementById('reportDate').value;
     const selectedUnit = document.getElementById('reportUnit').value;
+    const selectedFilter = document.getElementById('reportFilter').value;
     const reportPreview = document.getElementById('reportPreview');
     const reportText = document.getElementById('reportText');
     const copyBtn = document.getElementById('copyReportBtn');
@@ -2913,8 +2914,11 @@ function generateDailyReport() {
     const dayName = hebrewDayNames[dateObj.getDay()];
     const formattedDate = `${dateObj.getDate()}/${dateObj.getMonth() + 1}/${dateObj.getFullYear()}`;
 
+    // Determine filter label for report header
+    const filterLabel = selectedFilter === 'dorech' ? ' (דורך בלבד)' : '';
+
     let report = '';
-    report += `דוח נוכחות יומי\n`;
+    report += `דוח נוכחות יומי${filterLabel}\n`;
     report += `תאריך: ${formattedDate} (יום ${dayName})\n`;
     report += `${'='.repeat(40)}\n\n`;
 
@@ -2940,13 +2944,13 @@ function generateDailyReport() {
         });
 
         sortedUnits.forEach(unit => {
-            report += generateUnitReport(unit, unitGroups[unit], dateStr);
+            report += generateUnitReport(unit, unitGroups[unit], dateStr, selectedFilter);
             report += '\n';
         });
     } else {
         // Filter by selected unit
         membersToReport = teamMembers.filter(m => (m.mahlaka || '') === selectedUnit);
-        report += generateUnitReport(selectedUnit, membersToReport, dateStr);
+        report += generateUnitReport(selectedUnit, membersToReport, dateStr, selectedFilter);
     }
 
     // Add summary
@@ -2966,7 +2970,7 @@ function generateDailyReport() {
     copyBtn.style.display = 'inline-block';
 }
 
-function generateUnitReport(unitName, members, dateStr) {
+function generateUnitReport(unitName, members, dateStr, filterType = 'all') {
     let report = `📌 ${unitName}\n`;
     report += `${'-'.repeat(30)}\n`;
 
@@ -2977,7 +2981,15 @@ function generateUnitReport(unitName, members, dateStr) {
         return nameA.localeCompare(nameB, 'he');
     });
 
-    sortedMembers.forEach(member => {
+    // Filter members if dorech filter is active
+    const filteredMembers = filterType === 'dorech'
+        ? sortedMembers.filter(member => {
+            const status = getAttendanceStatus(member.ma, dateStr);
+            return status === 'present' || status === 'arriving';
+        })
+        : sortedMembers;
+
+    filteredMembers.forEach(member => {
         const status = getAttendanceStatus(member.ma, dateStr);
         const statusText = getStatusText(status);
         const name = `${member.firstName || ''} ${member.lastName || ''}`.trim();
@@ -2985,10 +2997,11 @@ function generateUnitReport(unitName, members, dateStr) {
         report += `${name} - ${statusText}${notes}\n`;
     });
 
-    // Unit summary
+    // Unit summary - always show full counts for context
     const unitPresent = countByStatus(members, dateStr, ['present', 'arriving']);
     const unitCounted = countByStatus(members, dateStr, ['present', 'arriving', 'leaving', 'counted', 'gimel']);
-    report += `\nסה"כ ${unitName}: ${members.length} | דורך: ${unitPresent} | ימ"מ: ${unitCounted}\n`;
+    const displayedCount = filterType === 'dorech' ? filteredMembers.length : members.length;
+    report += `\nסה"כ ${unitName}: ${displayedCount} | דורך: ${unitPresent} | ימ"מ: ${unitCounted}\n`;
 
     return report;
 }
