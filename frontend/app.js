@@ -168,33 +168,56 @@ function generateMemberHistory(member) {
     const name = `${member.firstName || ''} ${member.lastName || ''}`.trim();
     const dates = generateDateRange();
 
-    // Group consecutive dates by status
-    const history = [];
-    let currentRange = null;
-
-    dates.forEach(date => {
+    // Build daily status array first
+    const dailyStatuses = dates.map(date => {
         const dateStr = formatDate(date);
-        const status = (attendanceData[ma] && attendanceData[ma][dateStr]) || 'unmarked';
-
-        if (currentRange && currentRange.status === status) {
-            // Extend current range
-            currentRange.endDate = date;
-        } else {
-            // Start new range
-            if (currentRange) {
-                history.push(currentRange);
-            }
-            currentRange = {
-                status: status,
-                startDate: date,
-                endDate: date
-            };
-        }
+        return {
+            date: date,
+            dateStr: dateStr,
+            status: (attendanceData[ma] && attendanceData[ma][dateStr]) || 'unmarked'
+        };
     });
 
-    // Push last range
-    if (currentRange) {
-        history.push(currentRange);
+    // Group into ranges, detecting חד יומי pattern (+ followed by +)
+    const history = [];
+    let i = 0;
+
+    while (i < dailyStatuses.length) {
+        const current = dailyStatuses[i];
+
+        // Check for חד יומי pattern: single + followed by another + next day
+        if (current.status === 'arriving' && i + 1 < dailyStatuses.length) {
+            const next = dailyStatuses[i + 1];
+            if (next.status === 'arriving') {
+                // This is חד יומי - single day attendance
+                history.push({
+                    status: 'hadyomi',
+                    startDate: current.date,
+                    endDate: current.date
+                });
+                i++;
+                continue;
+            }
+        }
+
+        // Regular grouping - find consecutive days with same status
+        let endIndex = i;
+        while (endIndex + 1 < dailyStatuses.length &&
+               dailyStatuses[endIndex + 1].status === current.status) {
+            // But stop if we hit a + followed by + (that's start of new חד יומי)
+            if (current.status === 'arriving' && dailyStatuses[endIndex + 1].status === 'arriving') {
+                break;
+            }
+            endIndex++;
+        }
+
+        history.push({
+            status: current.status,
+            startDate: current.date,
+            endDate: dailyStatuses[endIndex].date
+        });
+
+        i = endIndex + 1;
     }
 
     // Format history for display
@@ -205,7 +228,8 @@ function generateMemberHistory(member) {
         'arriving': 'מגיע +',
         'leaving': 'יוצא -',
         'counted': 'חופש ○',
-        'gimel': 'ג\''
+        'gimel': 'ג\'',
+        'hadyomi': 'חד יומי ⚡'
     };
 
     let textContent = `📋 ${name}\n`;
@@ -264,7 +288,8 @@ function showMemberHistoryTooltip(event, member) {
         'arriving': 'status-arriving',
         'leaving': 'status-leaving',
         'counted': 'status-counted',
-        'gimel': 'status-gimel'
+        'gimel': 'status-gimel',
+        'hadyomi': 'status-hadyomi'
     };
 
     const statusText = {
@@ -274,7 +299,8 @@ function showMemberHistoryTooltip(event, member) {
         'arriving': 'מגיע +',
         'leaving': 'יוצא -',
         'counted': 'חופש ○',
-        'gimel': 'ג\''
+        'gimel': 'ג\'',
+        'hadyomi': 'חד יומי ⚡'
     };
 
     let historyHtml = '';
@@ -3212,7 +3238,7 @@ function generateUnitReport(unitName, members, dateStr, filterType = 'all') {
 
     filteredMembers.forEach(member => {
         const status = getAttendanceStatus(member.ma, dateStr);
-        const statusText = getStatusText(status);
+        const statusText = getStatusTextForReport(member.ma, dateStr, status);
         const name = `${member.firstName || ''} ${member.lastName || ''}`.trim();
         const notes = member.notes ? ` (${member.notes})` : '';
         report += `${name} - ${statusText}${notes}\n`;
@@ -3242,6 +3268,30 @@ function getStatusText(status) {
         'gimel': 'ג\''
     };
     return texts[status] || status;
+}
+
+// Get status text for report with חד יומי detection
+function getStatusTextForReport(ma, dateStr, status) {
+    // Check for חד יומי pattern: + today and + tomorrow
+    if (status === 'arriving') {
+        const currentDate = parseDate(dateStr);
+        const nextDate = new Date(currentDate);
+        nextDate.setDate(nextDate.getDate() + 1);
+        const nextDateStr = formatDate(nextDate);
+        const nextStatus = getAttendanceStatus(ma, nextDateStr);
+
+        if (nextStatus === 'arriving') {
+            return 'חד יומי ⚡';
+        }
+    }
+
+    return getStatusText(status);
+}
+
+// Parse date string (YYYY-MM-DD) to Date object
+function parseDate(dateStr) {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
 }
 
 function countByStatus(members, dateStr, statusList) {

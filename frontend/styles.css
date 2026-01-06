@@ -2801,6 +2801,7 @@ thead .col-setall {
 .member-history-tooltip .status-leaving { color: #f39c12; }
 .member-history-tooltip .status-counted { color: #e91e63; }
 .member-history-tooltip .status-gimel { color: #ff9800; }
+.member-history-tooltip .status-hadyomi { color: #9b59b6; }
 
 .member-history-tooltip .tooltip-summary {
     border-top: 1px solid rgba(255, 255, 255, 0.2);
