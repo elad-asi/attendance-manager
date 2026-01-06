@@ -2720,3 +2720,101 @@ thead .col-setall {
 .logged-in-user .user-email {
     opacity: 0.9;
 }
+
+/* Member History Tooltip */
+.member-history-tooltip {
+    position: fixed;
+    background: #2c3e50;
+    color: white;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    z-index: 10001;
+    max-width: 350px;
+    min-width: 250px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    direction: rtl;
+    text-align: right;
+    pointer-events: auto;
+}
+
+.member-history-tooltip .tooltip-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+}
+
+.member-history-tooltip .tooltip-name {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.member-history-tooltip .tooltip-copy-btn {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: background 0.2s;
+}
+
+.member-history-tooltip .tooltip-copy-btn:hover {
+    background: #2980b9;
+}
+
+.member-history-tooltip .tooltip-copy-btn.copied {
+    background: #27ae60;
+}
+
+.member-history-tooltip .tooltip-content {
+    max-height: 300px;
+    overflow-y: auto;
+    line-height: 1.6;
+}
+
+.member-history-tooltip .tooltip-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.member-history-tooltip .tooltip-content::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+.member-history-tooltip .tooltip-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.member-history-tooltip .history-line {
+    padding: 2px 0;
+}
+
+.member-history-tooltip .status-present { color: #2ecc71; }
+.member-history-tooltip .status-absent { color: #e74c3c; }
+.member-history-tooltip .status-arriving { color: #3498db; }
+.member-history-tooltip .status-leaving { color: #f39c12; }
+.member-history-tooltip .status-counted { color: #e91e63; }
+.member-history-tooltip .status-gimel { color: #ff9800; }
+
+.member-history-tooltip .tooltip-summary {
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    padding-top: 8px;
+    margin-top: 10px;
+    font-weight: 500;
+}
+
+/* Make name cells hoverable */
+.name-cell-hover {
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.name-cell-hover:hover {
+    background: rgba(52, 152, 219, 0.2) !important;
+}

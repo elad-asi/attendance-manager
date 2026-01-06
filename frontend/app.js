@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '3.0.2';  // Add dorech filter to daily report
+const FE_VERSION = '3.1.0';  // Add member history tooltip with copy for WhatsApp
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -154,6 +154,218 @@ function showSaveToast(message = 'נשמר בשרת', isError = false) {
     toastTimeout = setTimeout(() => {
         toast.classList.remove('show');
     }, 2000);
+}
+
+// ============================================
+// Member History Tooltip Functions
+// ============================================
+
+let currentTooltip = null;
+let tooltipTimeout = null;
+
+function generateMemberHistory(member) {
+    const ma = member.ma;
+    const name = `${member.firstName || ''} ${member.lastName || ''}`.trim();
+    const dates = getDateRange();
+
+    // Group consecutive dates by status
+    const history = [];
+    let currentRange = null;
+
+    dates.forEach(date => {
+        const dateStr = formatDate(date);
+        const status = (attendanceData[ma] && attendanceData[ma][dateStr]) || 'unmarked';
+
+        if (currentRange && currentRange.status === status) {
+            // Extend current range
+            currentRange.endDate = date;
+        } else {
+            // Start new range
+            if (currentRange) {
+                history.push(currentRange);
+            }
+            currentRange = {
+                status: status,
+                startDate: date,
+                endDate: date
+            };
+        }
+    });
+
+    // Push last range
+    if (currentRange) {
+        history.push(currentRange);
+    }
+
+    // Format history for display
+    const statusText = {
+        'unmarked': 'לא סומן',
+        'present': 'נוכח ✓',
+        'absent': 'נעדר ✗',
+        'arriving': 'מגיע +',
+        'leaving': 'יוצא -',
+        'counted': 'חופש ○',
+        'gimel': 'ג\''
+    };
+
+    let textContent = `📋 ${name}\n`;
+    if (member.notes) {
+        textContent += `📝 ${member.notes}\n`;
+    }
+    textContent += `${'─'.repeat(25)}\n`;
+
+    history.forEach(range => {
+        const startStr = formatDateHebrew(range.startDate);
+        const endStr = formatDateHebrew(range.endDate);
+        const statusLabel = statusText[range.status] || range.status;
+
+        if (startStr === endStr) {
+            textContent += `${startStr}: ${statusLabel}\n`;
+        } else {
+            textContent += `${startStr} - ${endStr}: ${statusLabel}\n`;
+        }
+    });
+
+    // Add summary
+    const dorech = calculateMemberTotal(ma, dates, TOTALS_CONFIG.mission);
+    const yamam = calculateMemberTotal(ma, dates, TOTALS_CONFIG.counted);
+    textContent += `${'─'.repeat(25)}\n`;
+    textContent += `סה"כ: דורך ${dorech} | ימ"מ ${yamam}`;
+
+    return { name, textContent, history };
+}
+
+function formatDateHebrew(date) {
+    const day = date.getDate();
+    const month = date.getMonth() + 1;
+    return `${day}/${month}`;
+}
+
+function showMemberHistoryTooltip(event, member) {
+    // Clear any pending hide
+    if (tooltipTimeout) {
+        clearTimeout(tooltipTimeout);
+        tooltipTimeout = null;
+    }
+
+    // Remove existing tooltip
+    hideMemberHistoryTooltip();
+
+    const { name, textContent, history } = generateMemberHistory(member);
+
+    // Create tooltip element
+    const tooltip = document.createElement('div');
+    tooltip.className = 'member-history-tooltip';
+
+    // Build HTML content
+    const statusColors = {
+        'present': 'status-present',
+        'absent': 'status-absent',
+        'arriving': 'status-arriving',
+        'leaving': 'status-leaving',
+        'counted': 'status-counted',
+        'gimel': 'status-gimel'
+    };
+
+    const statusText = {
+        'unmarked': 'לא סומן',
+        'present': 'נוכח ✓',
+        'absent': 'נעדר ✗',
+        'arriving': 'מגיע +',
+        'leaving': 'יוצא -',
+        'counted': 'חופש ○',
+        'gimel': 'ג\''
+    };
+
+    let historyHtml = '';
+    history.forEach(range => {
+        const startStr = formatDateHebrew(range.startDate);
+        const endStr = formatDateHebrew(range.endDate);
+        const statusLabel = statusText[range.status] || range.status;
+        const colorClass = statusColors[range.status] || '';
+
+        const dateRange = startStr === endStr ? startStr : `${startStr} - ${endStr}`;
+        historyHtml += `<div class="history-line"><span class="${colorClass}">${dateRange}: ${statusLabel}</span></div>`;
+    });
+
+    const dates = getDateRange();
+    const dorech = calculateMemberTotal(member.ma, dates, TOTALS_CONFIG.mission);
+    const yamam = calculateMemberTotal(member.ma, dates, TOTALS_CONFIG.counted);
+
+    tooltip.innerHTML = `
+        <div class="tooltip-header">
+            <span class="tooltip-name">📋 ${name}</span>
+            <button class="tooltip-copy-btn" onclick="copyMemberHistory(this, '${member.ma}')">📋 העתק</button>
+        </div>
+        ${member.notes ? `<div style="margin-bottom: 8px; opacity: 0.9;">📝 ${member.notes}</div>` : ''}
+        <div class="tooltip-content">
+            ${historyHtml}
+        </div>
+        <div class="tooltip-summary">
+            סה"כ: דורך ${dorech} | ימ"מ ${yamam}
+        </div>
+    `;
+
+    document.body.appendChild(tooltip);
+    currentTooltip = tooltip;
+
+    // Position tooltip near cursor
+    const rect = event.target.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+
+    let top = rect.top - tooltipRect.height - 10;
+    let left = rect.left;
+
+    // Adjust if off screen
+    if (top < 10) {
+        top = rect.bottom + 10;
+    }
+    if (left + tooltipRect.width > window.innerWidth - 10) {
+        left = window.innerWidth - tooltipRect.width - 10;
+    }
+    if (left < 10) {
+        left = 10;
+    }
+
+    tooltip.style.top = `${top}px`;
+    tooltip.style.left = `${left}px`;
+
+    // Keep tooltip visible when hovering over it
+    tooltip.addEventListener('mouseenter', () => {
+        if (tooltipTimeout) {
+            clearTimeout(tooltipTimeout);
+            tooltipTimeout = null;
+        }
+    });
+
+    tooltip.addEventListener('mouseleave', () => {
+        hideMemberHistoryTooltip();
+    });
+}
+
+function hideMemberHistoryTooltip() {
+    if (currentTooltip) {
+        currentTooltip.remove();
+        currentTooltip = null;
+    }
+}
+
+function copyMemberHistory(button, ma) {
+    const member = teamMembers.find(m => m.ma === ma);
+    if (!member) return;
+
+    const { textContent } = generateMemberHistory(member);
+
+    navigator.clipboard.writeText(textContent).then(() => {
+        button.textContent = '✓ הועתק!';
+        button.classList.add('copied');
+        setTimeout(() => {
+            button.textContent = '📋 העתק';
+            button.classList.remove('copied');
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+    });
 }
 
 // ============================================
@@ -2156,8 +2368,8 @@ function renderTable() {
 
         row.innerHTML = `
             <td class="sticky-col col-index" style="right: ${colPositions.index}px">${index + 1}</td>
-            <td class="sticky-col" style="right: ${colPositions.firstname}px">${member.firstName || ''}</td>
-            <td class="sticky-col" style="right: ${colPositions.lastname}px">${member.lastName || ''}</td>
+            <td class="sticky-col name-cell-hover" style="right: ${colPositions.firstname}px" data-ma="${member.ma}">${member.firstName || ''}</td>
+            <td class="sticky-col name-cell-hover" style="right: ${colPositions.lastname}px" data-ma="${member.ma}">${member.lastName || ''}</td>
             <td class="sticky-col" style="right: ${colPositions.ma}px">${member.ma}</td>
             <td class="sticky-col" style="right: ${colPositions.gdud}px">${member.gdud || ''}</td>
             <td class="sticky-col" style="right: ${colPositions.pluga}px">${member.pluga || ''}</td>
@@ -2174,6 +2386,15 @@ function renderTable() {
         if (setAllBtn) {
             setAllBtn.addEventListener('click', () => toggleRowForMember(member.ma));
         }
+
+        // Add hover handlers for name cells (member history tooltip)
+        const nameCells = row.querySelectorAll('.name-cell-hover');
+        nameCells.forEach(cell => {
+            cell.addEventListener('mouseenter', (e) => showMemberHistoryTooltip(e, member));
+            cell.addEventListener('mouseleave', () => {
+                tooltipTimeout = setTimeout(() => hideMemberHistoryTooltip(), 300);
+            });
+        });
 
         dates.forEach(date => {
             const dateStr = formatDate(date);

@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '3.0.0'  # Google OAuth verification ready
+BE_VERSION = '3.1.0'  # Member history tooltip
 
 # NOTE: Using local SQLite for fast reads/writes with periodic Neon sync
 
