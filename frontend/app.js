@@ -100,7 +100,7 @@ const STATUS_TOOLTIPS = {
 
 // Define which statuses count for each total
 const TOTALS_CONFIG = {
-    mission: ['present', 'arriving'],
+    mission: ['present', 'arriving', 'leaving'],  // דורך = ✓ + -
     includeLeave: ['present', 'arriving', 'leaving'],
     counted: ['present', 'arriving', 'leaving', 'counted', 'gimel']
 };
@@ -2321,7 +2321,7 @@ function renderTotalRows(totalsTbody, dates, filteredMembers) {
 
     // Using HTML for colored symbols: green ✓ for present, red ○ for counted
     const totals = [
-        { key: 'mission', label: STRINGS.totalMission, symbols: '(<span class="symbol-present">✓</span> +)', class: 'total-mission' },
+        { key: 'mission', label: STRINGS.totalMission, symbols: '(<span class="symbol-present">✓</span> + -)', class: 'total-mission' },
         { key: 'includeLeave', label: STRINGS.totalIncludeLeave, symbols: '(<span class="symbol-present">✓</span> + -)', class: 'total-leave' },
         { key: 'counted', label: STRINGS.totalCounted, symbols: '(<span class="symbol-present">✓</span> + - <span class="symbol-counted">○</span>)', class: 'total-counted' }
     ];
@@ -2954,14 +2954,14 @@ function generateDailyReport() {
     }
 
     // Add summary
-    const totalPresent = countByStatus(membersToReport, dateStr, ['present', 'arriving']);
+    const totalDorech = countByStatus(membersToReport, dateStr, ['present', 'arriving', 'leaving']);
     const totalAbsent = countByStatus(membersToReport, dateStr, ['absent']);
     const totalCounted = countByStatus(membersToReport, dateStr, ['present', 'arriving', 'leaving', 'counted', 'gimel']);
 
     report += `${'='.repeat(40)}\n`;
     report += `סיכום כללי:\n`;
     report += `סה"כ אנשים: ${membersToReport.length}\n`;
-    report += `נוכחים (דורך): ${totalPresent}\n`;
+    report += `דורך (✓ + -): ${totalDorech}\n`;
     report += `נעדרים: ${totalAbsent}\n`;
     report += `ימ"מ: ${totalCounted}\n`;
 
@@ -2981,11 +2981,11 @@ function generateUnitReport(unitName, members, dateStr, filterType = 'all') {
         return nameA.localeCompare(nameB, 'he');
     });
 
-    // Filter members if dorech filter is active
+    // Filter members if dorech filter is active (✓ + -)
     const filteredMembers = filterType === 'dorech'
         ? sortedMembers.filter(member => {
             const status = getAttendanceStatus(member.ma, dateStr);
-            return status === 'present' || status === 'arriving';
+            return status === 'present' || status === 'arriving' || status === 'leaving';
         })
         : sortedMembers;
 
@@ -2998,10 +2998,10 @@ function generateUnitReport(unitName, members, dateStr, filterType = 'all') {
     });
 
     // Unit summary - always show full counts for context
-    const unitPresent = countByStatus(members, dateStr, ['present', 'arriving']);
+    const unitDorech = countByStatus(members, dateStr, ['present', 'arriving', 'leaving']);
     const unitCounted = countByStatus(members, dateStr, ['present', 'arriving', 'leaving', 'counted', 'gimel']);
     const displayedCount = filterType === 'dorech' ? filteredMembers.length : members.length;
-    report += `\nסה"כ ${unitName}: ${displayedCount} | דורך: ${unitPresent} | ימ"מ: ${unitCounted}\n`;
+    report += `\nסה"כ ${unitName}: ${displayedCount} | דורך: ${unitDorech} | ימ"מ: ${unitCounted}\n`;
 
     return report;
 }
