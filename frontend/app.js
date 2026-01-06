@@ -166,7 +166,7 @@ let tooltipTimeout = null;
 function generateMemberHistory(member) {
     const ma = member.ma;
     const name = `${member.firstName || ''} ${member.lastName || ''}`.trim();
-    const dates = getDateRange();
+    const dates = generateDateRange();
 
     // Group consecutive dates by status
     const history = [];
@@ -288,7 +288,7 @@ function showMemberHistoryTooltip(event, member) {
         historyHtml += `<div class="history-line"><span class="${colorClass}">${dateRange}: ${statusLabel}</span></div>`;
     });
 
-    const dates = getDateRange();
+    const dates = generateDateRange();
     const dorech = calculateMemberTotal(member.ma, dates, TOTALS_CONFIG.mission);
     const yamam = calculateMemberTotal(member.ma, dates, TOTALS_CONFIG.counted);
 
