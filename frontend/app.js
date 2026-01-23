@@ -3274,10 +3274,7 @@ function getStatusText(status) {
 function getStatusTextForReport(ma, dateStr, status) {
     // Check for חד יומי pattern: + today and + tomorrow
     if (status === 'arriving') {
-        const currentDate = parseDate(dateStr);
-        const nextDate = new Date(currentDate);
-        nextDate.setDate(nextDate.getDate() + 1);
-        const nextDateStr = formatDate(nextDate);
+        const nextDateStr = getNextDateStr(dateStr);
         const nextStatus = getAttendanceStatus(ma, nextDateStr);
 
         if (nextStatus === 'arriving') {
@@ -3288,10 +3285,15 @@ function getStatusTextForReport(ma, dateStr, status) {
     return getStatusText(status);
 }
 
-// Parse date string (YYYY-MM-DD) to Date object
-function parseDate(dateStr) {
+// Get next day's date string (YYYY-MM-DD format)
+function getNextDateStr(dateStr) {
     const [year, month, day] = dateStr.split('-').map(Number);
-    return new Date(year, month - 1, day);
+    const date = new Date(year, month - 1, day);
+    date.setDate(date.getDate() + 1);
+    const nextYear = date.getFullYear();
+    const nextMonth = String(date.getMonth() + 1).padStart(2, '0');
+    const nextDay = String(date.getDate()).padStart(2, '0');
+    return `${nextYear}-${nextMonth}-${nextDay}`;
 }
 
 function countByStatus(members, dateStr, statusList) {
