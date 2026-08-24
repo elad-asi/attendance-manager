@@ -36,6 +36,14 @@ SCOPES = [
 # Ensure data directory exists
 os.makedirs('data', exist_ok=True)
 
+@app.before_request
+def _ensure_db_initialized():
+    # Lazy init must run before any API handler; without this, a cold start
+    # whose first request hits an endpoint that skips ensure_initialized()
+    # (e.g. /api/sheets) fails with "no such table" until another endpoint runs.
+    if request.path.startswith('/api/'):
+        db.ensure_initialized()
+
 # ============================================
 # Static File Serving
 # ============================================
