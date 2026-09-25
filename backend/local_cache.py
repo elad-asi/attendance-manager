@@ -745,9 +745,11 @@ def get_pending_sync_count():
         return count
 
 def force_sync_now():
-    """Force an immediate sync to Neon"""
+    """Force an immediate sync: push pending to Neon, then pull latest from Neon
+    so this instance also picks up changes made by other instances."""
     ensure_initialized()  # Lazy init for gunicorn
     push_pending_to_neon()
+    pull_from_neon()
 
 # ============================================
 # Startup

@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # Version
-BE_VERSION = '3.1.0'  # Member history tooltip
+BE_VERSION = '3.2.1'  # force-sync now also pulls from Neon; skip לגריעה rows
 
 # NOTE: Using local SQLite for fast reads/writes with periodic Neon sync
 
@@ -320,6 +320,10 @@ def get_sheet_data():
             if len(row) == 0:
                 continue
 
+            # Skip rows marked for removal (לגריעה)
+            if any('לגריעה' in str(cell) for cell in row):
+                continue
+
             # Get values safely using header_map
             def get_value(field, default_idx=None):
                 idx = header_map.get(field, default_idx)
@@ -404,6 +408,10 @@ def parse_sheet_with_mapping():
         members = []
         for row in rows:
             if len(row) == 0:
+                continue
+
+            # Skip rows marked for removal (לגריעה)
+            if any('לגריעה' in str(cell) for cell in row):
                 continue
 
             def get_value(field):

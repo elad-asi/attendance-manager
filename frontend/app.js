@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '3.1.0';  // Add member history tooltip with copy for WhatsApp
+const FE_VERSION = '3.3.0';  // Add דורך/יממ ratio column
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -118,6 +118,7 @@ const STRINGS = {
     notes: 'הערות',
     dorech: 'דורך',
     yamam: 'ימ"מ',
+    ratio: 'יחס',
     totalMission: 'דורך',
     totalIncludeLeave: 'דו"ח 1',
     totalCounted: 'ימ"מ'
@@ -1631,6 +1632,9 @@ function parseRowsWithMapping(rows, columnMapping, gdud, pluga) {
     for (const row of rows) {
         if (!row || row.length === 0) continue;
 
+        // Skip rows marked for removal (לגריעה)
+        if (row.some(cell => typeof cell === 'string' && cell.includes('לגריעה'))) continue;
+
         function getValue(field) {
             const idx = columnMapping[field];
             if (idx === 'skip' || idx === undefined || idx === null) return '';
@@ -2335,6 +2339,8 @@ function renderTable() {
     rightPos += 50;
     colPositions.yamam = rightPos;
     rightPos += 50;
+    colPositions.ratio = rightPos;
+    rightPos += 50;
     colPositions.setall = rightPos;
 
     // Clear existing content - columns vary based on skipped preferences
@@ -2350,6 +2356,7 @@ function renderTable() {
         ${showNotes ? `<th class="sticky-col col-notes" style="right: ${colPositions.notes}px">${STRINGS.notes}</th>` : ''}
         <th class="sticky-col col-dorech" style="right: ${colPositions.dorech}px">${STRINGS.dorech}</th>
         <th class="sticky-col col-yamam" style="right: ${colPositions.yamam}px">${STRINGS.yamam}</th>
+        <th class="sticky-col col-ratio" style="right: ${colPositions.ratio}px" title="דורך / יממ">${STRINGS.ratio}</th>
         <th class="sticky-col col-setall" style="right: ${colPositions.setall}px">מלא</th>
     `;
     tbody.innerHTML = '';
@@ -2404,6 +2411,7 @@ function renderTable() {
             ${showNotes ? `<td class="sticky-col col-notes" style="right: ${colPositions.notes}px" title="${member.notes || ''}">${member.notes || ''}</td>` : ''}
             <td class="sticky-col col-dorech member-dorech" style="right: ${colPositions.dorech}px" data-ma="${member.ma}">${memberDorech}</td>
             <td class="sticky-col col-yamam member-yamam" style="right: ${colPositions.yamam}px" data-ma="${member.ma}">${memberYamam}</td>
+            <td class="sticky-col col-ratio member-ratio" style="right: ${colPositions.ratio}px" data-ma="${member.ma}">${formatDorechYamamRatio(memberDorech, memberYamam)}</td>
             <td class="sticky-col col-setall" style="right: ${colPositions.setall}px"><button class="btn-setall ${isRowFilled(member.ma) ? 'clear-mode' : ''}" data-ma="${member.ma}" title="${isRowFilled(member.ma) ? 'נקה הכל' : 'מלא הכל'}">${isRowFilled(member.ma) ? '✕' : '▶'}</button></td>
         `;
 
@@ -2476,7 +2484,7 @@ function syncTotalsWithMainTable() {
 
     // Calculate the total width of fixed columns (for the label colspan cell)
     // Find the first date column (after all fixed columns)
-    let fixedColsCount = 12; // default (includes notes column)
+    let fixedColsCount = 13; // default (includes notes and ratio columns)
     if (skippedColumns.includes('mahlaka')) fixedColsCount--;
     if (skippedColumns.includes('miktzoaTzvai')) fixedColsCount--;
     if (skippedColumns.includes('notes')) fixedColsCount--;
@@ -2597,9 +2605,10 @@ function renderTotalRows(totalsTbody, dates, filteredMembers) {
         fixedColumns.push({ class: 'col-notes', width: 100 });
     }
 
-    // Add dorech, yamam, setall columns
+    // Add dorech, yamam, ratio, setall columns
     fixedColumns.push({ class: 'col-dorech', width: 50 });
     fixedColumns.push({ class: 'col-yamam', width: 50 });
+    fixedColumns.push({ class: 'col-ratio', width: 50 });
     fixedColumns.push({ class: 'col-setall', width: 45 });
 
     totals.forEach((total, idx) => {
@@ -3000,17 +3009,29 @@ function updateAllTotals() {
     });
 }
 
-// Update a specific member's dorech and yamam totals
+// Format the dorech/yamam ratio as a percentage
+function formatDorechYamamRatio(dorech, yamam) {
+    if (!yamam) return '-';
+    return Math.round((dorech / yamam) * 100) + '%';
+}
+
+// Update a specific member's dorech, yamam and ratio totals
 function updateMemberTotals(ma) {
     const dates = generateDateRange();
     const dorechCell = document.querySelector(`.member-dorech[data-ma="${ma}"]`);
     const yamamCell = document.querySelector(`.member-yamam[data-ma="${ma}"]`);
+    const ratioCell = document.querySelector(`.member-ratio[data-ma="${ma}"]`);
 
+    const dorech = calculateMemberTotal(ma, dates, TOTALS_CONFIG.mission);
+    const yamam = calculateMemberTotal(ma, dates, TOTALS_CONFIG.counted);
     if (dorechCell) {
-        dorechCell.textContent = calculateMemberTotal(ma, dates, TOTALS_CONFIG.mission);
+        dorechCell.textContent = dorech;
     }
     if (yamamCell) {
-        yamamCell.textContent = calculateMemberTotal(ma, dates, TOTALS_CONFIG.counted);
+        yamamCell.textContent = yamam;
+    }
+    if (ratioCell) {
+        ratioCell.textContent = formatDorechYamamRatio(dorech, yamam);
     }
 }
 
