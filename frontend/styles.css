@@ -1089,6 +1089,22 @@ header h1 {
     font-weight: 600;
 }
 
+/* hitargenut status colors - override zebra/hover backgrounds */
+#attendanceTable tbody tr td.col-hitargenut.hit-ok {
+    background: #b7e3b0 !important;
+    color: #1b5e20;
+}
+
+#attendanceTable tbody tr td.col-hitargenut.hit-under {
+    background: #f5b8b8 !important;
+    color: #b71c1c;
+}
+
+#attendanceTable tbody tr td.col-hitargenut.hit-over {
+    background: #ffd9a0 !important;
+    color: #a65f00;
+}
+
 .col-setall {
     min-width: 45px;
     text-align: center;
