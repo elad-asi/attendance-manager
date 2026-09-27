@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '3.4.2';  // התארגנות: actual Dec 4-15 vs entitlement, colored
+const FE_VERSION = '3.4.3';  // התארגנות: שמ"פ window fixed to Oct 25-Dec 3
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -2360,7 +2360,7 @@ function renderTable() {
         <th class="sticky-col col-dorech" style="right: ${colPositions.dorech}px">${STRINGS.dorech}</th>
         <th class="sticky-col col-yamam" style="right: ${colPositions.yamam}px">${STRINGS.yamam}</th>
         <th class="sticky-col col-ratio" style="right: ${colPositions.ratio}px" title="דורך / יממ">${STRINGS.ratio}</th>
-        <th class="sticky-col col-hitargenut" style="right: ${colPositions.hitargenut}px" title="בפועל 04.12–15.12 / זכאות לפי משך שמ\"פ">${STRINGS.hitargenut}</th>
+        <th class="sticky-col col-hitargenut" style="right: ${colPositions.hitargenut}px" title="בפועל 04.12–15.12 / זכאות לפי שמ\"פ 25.10–03.12">${STRINGS.hitargenut}</th>
         <th class="sticky-col col-setall" style="right: ${colPositions.setall}px">מלא</th>
     `;
     tbody.innerHTML = '';
@@ -2416,7 +2416,7 @@ function renderTable() {
             <td class="sticky-col col-dorech member-dorech" style="right: ${colPositions.dorech}px" data-ma="${member.ma}">${memberDorech}</td>
             <td class="sticky-col col-yamam member-yamam" style="right: ${colPositions.yamam}px" data-ma="${member.ma}">${memberYamam}</td>
             <td class="sticky-col col-ratio member-ratio" style="right: ${colPositions.ratio}px" data-ma="${member.ma}">${formatDorechYamamRatio(memberDorech, memberYamam)}</td>
-            <td class="sticky-col col-hitargenut member-hitargenut ${hitargenutDisplay(member.ma, memberYamam).cls}" style="right: ${colPositions.hitargenut}px" data-ma="${member.ma}">${hitargenutDisplay(member.ma, memberYamam).text}</td>
+            <td class="sticky-col col-hitargenut member-hitargenut ${hitargenutDisplay(member.ma).cls}" style="right: ${colPositions.hitargenut}px" data-ma="${member.ma}">${hitargenutDisplay(member.ma).text}</td>
             <td class="sticky-col col-setall" style="right: ${colPositions.setall}px"><button class="btn-setall ${isRowFilled(member.ma) ? 'clear-mode' : ''}" data-ma="${member.ma}" title="${isRowFilled(member.ma) ? 'נקה הכל' : 'מלא הכל'}">${isRowFilled(member.ma) ? '✕' : '▶'}</button></td>
         `;
 
@@ -3049,10 +3049,26 @@ function hitargenutActual(ma) {
     return count;
 }
 
+// שמ"פ length: counted days (יממ statuses) in the fixed service window
+const SHAMAP_START = '2026-10-25';
+const SHAMAP_END = '2026-12-03';
+function shamapDays(ma) {
+    let count = 0;
+    const d = new Date(SHAMAP_START);
+    const end = new Date(SHAMAP_END);
+    while (d <= end) {
+        const dateStr = formatDate(d);
+        const status = (attendanceData[ma] && attendanceData[ma][dateStr]) || 'unmarked';
+        if (TOTALS_CONFIG.counted.includes(status)) count++;
+        d.setDate(d.getDate() + 1);
+    }
+    return count;
+}
+
 // Cell text + color class: green when actual matches entitlement,
 // red when under, orange when over; neutral when 0/0
-function hitargenutDisplay(ma, yamam) {
-    const entitled = hitargenutDays(yamam);
+function hitargenutDisplay(ma) {
+    const entitled = hitargenutDays(shamapDays(ma));
     const actual = hitargenutActual(ma);
     let cls = '';
     if (entitled !== 0 || actual !== 0) {
@@ -3081,7 +3097,7 @@ function updateMemberTotals(ma) {
         ratioCell.textContent = formatDorechYamamRatio(dorech, yamam);
     }
     if (hitargenutCell) {
-        const hit = hitargenutDisplay(ma, yamam);
+        const hit = hitargenutDisplay(ma);
         hitargenutCell.textContent = hit.text;
         hitargenutCell.classList.remove('hit-ok', 'hit-under', 'hit-over');
         if (hit.cls) hitargenutCell.classList.add(hit.cls);
