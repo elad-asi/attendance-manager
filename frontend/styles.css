@@ -1083,6 +1083,12 @@ header h1 {
     font-weight: 600;
 }
 
+.col-hitargenut {
+    min-width: 70px;
+    color: #1a6b5a;
+    font-weight: 600;
+}
+
 .col-setall {
     min-width: 45px;
     text-align: center;
@@ -1092,6 +1098,7 @@ header h1 {
 thead .col-dorech,
 thead .col-yamam,
 thead .col-ratio,
+thead .col-hitargenut,
 thead .col-setall {
     background: #2c3e50 !important;
     color: white;
@@ -1181,6 +1188,10 @@ thead .col-setall {
     background: #fdf3d1;
 }
 
+#attendanceTable tbody tr:nth-child(odd) td.col-hitargenut {
+    background: #d1f0e8;
+}
+
 /* Even rows - sticky columns background */
 #attendanceTable tbody tr:nth-child(even) td.sticky-col {
     background: #f8f9fa;
@@ -1199,6 +1210,10 @@ thead .col-setall {
     background: #f7e9b8;
 }
 
+#attendanceTable tbody tr:nth-child(even) td.col-hitargenut {
+    background: #bfe5d9;
+}
+
 /* Hover state - sticky columns background */
 #attendanceTable tbody tr:hover td.sticky-col {
     background: #e3f2fd;
@@ -1215,6 +1230,10 @@ thead .col-setall {
 
 #attendanceTable tbody tr:hover td.col-ratio {
     background: #eed98a;
+}
+
+#attendanceTable tbody tr:hover td.col-hitargenut {
+    background: #9fd8c6;
 }
 
 /* Missing MA - mark row text in red */

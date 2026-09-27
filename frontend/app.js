@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '3.3.0';  // Add דורך/יממ ratio column
+const FE_VERSION = '3.4.0';  // Add התארגנות column (presence Dec 4-15)
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -119,6 +119,7 @@ const STRINGS = {
     dorech: 'דורך',
     yamam: 'ימ"מ',
     ratio: 'יחס',
+    hitargenut: 'התארגנות',
     totalMission: 'דורך',
     totalIncludeLeave: 'דו"ח 1',
     totalCounted: 'ימ"מ'
@@ -2341,6 +2342,8 @@ function renderTable() {
     rightPos += 50;
     colPositions.ratio = rightPos;
     rightPos += 50;
+    colPositions.hitargenut = rightPos;
+    rightPos += 70;
     colPositions.setall = rightPos;
 
     // Clear existing content - columns vary based on skipped preferences
@@ -2357,6 +2360,7 @@ function renderTable() {
         <th class="sticky-col col-dorech" style="right: ${colPositions.dorech}px">${STRINGS.dorech}</th>
         <th class="sticky-col col-yamam" style="right: ${colPositions.yamam}px">${STRINGS.yamam}</th>
         <th class="sticky-col col-ratio" style="right: ${colPositions.ratio}px" title="דורך / יממ">${STRINGS.ratio}</th>
+        <th class="sticky-col col-hitargenut" style="right: ${colPositions.hitargenut}px" title="נוכחות 04.12–15.12">${STRINGS.hitargenut}</th>
         <th class="sticky-col col-setall" style="right: ${colPositions.setall}px">מלא</th>
     `;
     tbody.innerHTML = '';
@@ -2412,6 +2416,7 @@ function renderTable() {
             <td class="sticky-col col-dorech member-dorech" style="right: ${colPositions.dorech}px" data-ma="${member.ma}">${memberDorech}</td>
             <td class="sticky-col col-yamam member-yamam" style="right: ${colPositions.yamam}px" data-ma="${member.ma}">${memberYamam}</td>
             <td class="sticky-col col-ratio member-ratio" style="right: ${colPositions.ratio}px" data-ma="${member.ma}">${formatDorechYamamRatio(memberDorech, memberYamam)}</td>
+            <td class="sticky-col col-hitargenut member-hitargenut" style="right: ${colPositions.hitargenut}px" data-ma="${member.ma}">${calculateHitargenut(member.ma)}</td>
             <td class="sticky-col col-setall" style="right: ${colPositions.setall}px"><button class="btn-setall ${isRowFilled(member.ma) ? 'clear-mode' : ''}" data-ma="${member.ma}" title="${isRowFilled(member.ma) ? 'נקה הכל' : 'מלא הכל'}">${isRowFilled(member.ma) ? '✕' : '▶'}</button></td>
         `;
 
@@ -2484,7 +2489,7 @@ function syncTotalsWithMainTable() {
 
     // Calculate the total width of fixed columns (for the label colspan cell)
     // Find the first date column (after all fixed columns)
-    let fixedColsCount = 13; // default (includes notes and ratio columns)
+    let fixedColsCount = 14; // default (includes notes, ratio and hitargenut columns)
     if (skippedColumns.includes('mahlaka')) fixedColsCount--;
     if (skippedColumns.includes('miktzoaTzvai')) fixedColsCount--;
     if (skippedColumns.includes('notes')) fixedColsCount--;
@@ -2609,6 +2614,7 @@ function renderTotalRows(totalsTbody, dates, filteredMembers) {
     fixedColumns.push({ class: 'col-dorech', width: 50 });
     fixedColumns.push({ class: 'col-yamam', width: 50 });
     fixedColumns.push({ class: 'col-ratio', width: 50 });
+    fixedColumns.push({ class: 'col-hitargenut', width: 70 });
     fixedColumns.push({ class: 'col-setall', width: 45 });
 
     totals.forEach((total, idx) => {
@@ -3015,12 +3021,29 @@ function formatDorechYamamRatio(dorech, yamam) {
     return Math.round((dorech / yamam) * 100) + '%';
 }
 
+// התארגנות: on-base days (דורך statuses) in the fixed preparation window
+const HITARGENUT_START = '2026-12-04';
+const HITARGENUT_END = '2026-12-15';
+function calculateHitargenut(ma) {
+    let count = 0;
+    const d = new Date(HITARGENUT_START);
+    const end = new Date(HITARGENUT_END);
+    while (d <= end) {
+        const dateStr = formatDate(d);
+        const status = (attendanceData[ma] && attendanceData[ma][dateStr]) || 'unmarked';
+        if (TOTALS_CONFIG.mission.includes(status)) count++;
+        d.setDate(d.getDate() + 1);
+    }
+    return count;
+}
+
 // Update a specific member's dorech, yamam and ratio totals
 function updateMemberTotals(ma) {
     const dates = generateDateRange();
     const dorechCell = document.querySelector(`.member-dorech[data-ma="${ma}"]`);
     const yamamCell = document.querySelector(`.member-yamam[data-ma="${ma}"]`);
     const ratioCell = document.querySelector(`.member-ratio[data-ma="${ma}"]`);
+    const hitargenutCell = document.querySelector(`.member-hitargenut[data-ma="${ma}"]`);
 
     const dorech = calculateMemberTotal(ma, dates, TOTALS_CONFIG.mission);
     const yamam = calculateMemberTotal(ma, dates, TOTALS_CONFIG.counted);
@@ -3032,6 +3055,9 @@ function updateMemberTotals(ma) {
     }
     if (ratioCell) {
         ratioCell.textContent = formatDorechYamamRatio(dorech, yamam);
+    }
+    if (hitargenutCell) {
+        hitargenutCell.textContent = calculateHitargenut(ma);
     }
 }
 
