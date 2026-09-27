@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '3.4.3';  // התארגנות: שמ"פ window fixed to Oct 25-Dec 3
+const FE_VERSION = '3.4.4';  // דורך/יממ/יחס counted over fixed window 25.10-03.12
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -2357,8 +2357,8 @@ function renderTable() {
         ${showMahlaka ? `<th class="sticky-col col-mahlaka" style="right: ${colPositions.mahlaka}px">${mahlakaFilter}</th>` : ''}
         ${showMiktzoaTzvai ? `<th class="sticky-col col-miktzoa" style="right: ${colPositions.miktzoa}px">${STRINGS.miktzoaTzvai}</th>` : ''}
         ${showNotes ? `<th class="sticky-col col-notes" style="right: ${colPositions.notes}px">${STRINGS.notes}</th>` : ''}
-        <th class="sticky-col col-dorech" style="right: ${colPositions.dorech}px">${STRINGS.dorech}</th>
-        <th class="sticky-col col-yamam" style="right: ${colPositions.yamam}px">${STRINGS.yamam}</th>
+        <th class="sticky-col col-dorech" style="right: ${colPositions.dorech}px" title="25.10–03.12">${STRINGS.dorech}</th>
+        <th class="sticky-col col-yamam" style="right: ${colPositions.yamam}px" title="25.10–03.12">${STRINGS.yamam}</th>
         <th class="sticky-col col-ratio" style="right: ${colPositions.ratio}px" title="דורך / יממ">${STRINGS.ratio}</th>
         <th class="sticky-col col-hitargenut" style="right: ${colPositions.hitargenut}px" title="בפועל 04.12–15.12 / זכאות לפי שמ\"פ 25.10–03.12">${STRINGS.hitargenut}</th>
         <th class="sticky-col col-setall" style="right: ${colPositions.setall}px">מלא</th>
@@ -2399,9 +2399,9 @@ function renderTable() {
             row.classList.add('missing-ma');
         }
 
-        // Calculate dorech and yamam for this member across all dates
-        const memberDorech = calculateMemberTotal(member.ma, dates, TOTALS_CONFIG.mission);
-        const memberYamam = calculateMemberTotal(member.ma, dates, TOTALS_CONFIG.counted);
+        // Dorech/yamam for this member over the fixed service window (25.10-03.12)
+        const memberDorech = fixedMemberTotal(member.ma, TOTALS_CONFIG.mission);
+        const memberYamam = fixedMemberTotal(member.ma, TOTALS_CONFIG.counted);
 
         row.innerHTML = `
             <td class="sticky-col col-index" style="right: ${colPositions.index}px">${index + 1}</td>
@@ -3052,17 +3052,21 @@ function hitargenutActual(ma) {
 // שמ"פ length: counted days (יממ statuses) in the fixed service window
 const SHAMAP_START = '2026-10-25';
 const SHAMAP_END = '2026-12-03';
-function shamapDays(ma) {
+function fixedMemberTotal(ma, statusList) {
     let count = 0;
     const d = new Date(SHAMAP_START);
     const end = new Date(SHAMAP_END);
     while (d <= end) {
         const dateStr = formatDate(d);
         const status = (attendanceData[ma] && attendanceData[ma][dateStr]) || 'unmarked';
-        if (TOTALS_CONFIG.counted.includes(status)) count++;
+        if (statusList.includes(status)) count++;
         d.setDate(d.getDate() + 1);
     }
     return count;
+}
+
+function shamapDays(ma) {
+    return fixedMemberTotal(ma, TOTALS_CONFIG.counted);
 }
 
 // Cell text + color class: green when actual matches entitlement,
@@ -3079,14 +3083,13 @@ function hitargenutDisplay(ma) {
 
 // Update a specific member's dorech, yamam and ratio totals
 function updateMemberTotals(ma) {
-    const dates = generateDateRange();
     const dorechCell = document.querySelector(`.member-dorech[data-ma="${ma}"]`);
     const yamamCell = document.querySelector(`.member-yamam[data-ma="${ma}"]`);
     const ratioCell = document.querySelector(`.member-ratio[data-ma="${ma}"]`);
     const hitargenutCell = document.querySelector(`.member-hitargenut[data-ma="${ma}"]`);
 
-    const dorech = calculateMemberTotal(ma, dates, TOTALS_CONFIG.mission);
-    const yamam = calculateMemberTotal(ma, dates, TOTALS_CONFIG.counted);
+    const dorech = fixedMemberTotal(ma, TOTALS_CONFIG.mission);
+    const yamam = fixedMemberTotal(ma, TOTALS_CONFIG.counted);
     if (dorechCell) {
         dorechCell.textContent = dorech;
     }
