@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '3.4.5';  // Hide-empty-rows toggle
+const FE_VERSION = '3.4.6';  // Totals tooltip: per-unit breakdown
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -2675,11 +2675,28 @@ function renderTotalRows(totalsTbody, dates, filteredMembers) {
             const cell = document.createElement('td');
             cell.className = `total-cell ${total.class}`;
             cell.textContent = count;
+            const tip = totalTooltipByUnit(dateStr, TOTALS_CONFIG[total.key], membersToCount);
+            if (tip) cell.title = tip;
             row.appendChild(cell);
         });
 
         totalsTbody.appendChild(row);
     });
+}
+
+// Per-unit (mahlaka) breakdown of a day's total, for the totals tooltip
+function totalTooltipByUnit(dateStr, statusList, membersToCount) {
+    const members = membersToCount || teamMembers;
+    const byUnit = {};
+    members.forEach(member => {
+        const status = (attendanceData[member.ma] && attendanceData[member.ma][dateStr]) || 'unmarked';
+        if (statusList.includes(status)) {
+            const unit = member.mahlaka || 'ללא מחלקה';
+            byUnit[unit] = (byUnit[unit] || 0) + 1;
+        }
+    });
+    return Object.keys(byUnit).sort()
+        .map(u => `${u}: ${byUnit[u]}`).join('\n');
 }
 
 function calculateTotal(dateStr, statusList, membersToCount) {
