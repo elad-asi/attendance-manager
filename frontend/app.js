@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '3.4.4';  // דורך/יממ/יחס counted over fixed window 25.10-03.12
+const FE_VERSION = '3.4.5';  // Hide-empty-rows toggle
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -623,6 +623,8 @@ function initializeAppClean() {
     // Toggle column visibility
     document.getElementById('toggleMiktzoa').addEventListener('click', toggleMiktzoaColumn);
     document.getElementById('toggleNotes').addEventListener('click', toggleNotesColumn);
+    document.getElementById('toggleEmptyRows').addEventListener('click', toggleEmptyRows);
+    updateEmptyRowsButton();
 
     // Render empty table with "no data" message
     renderTable();
@@ -783,6 +785,8 @@ function initializeApp() {
     // Toggle column visibility
     document.getElementById('toggleMiktzoa').addEventListener('click', toggleMiktzoaColumn);
     document.getElementById('toggleNotes').addEventListener('click', toggleNotesColumn);
+    document.getElementById('toggleEmptyRows').addEventListener('click', toggleEmptyRows);
+    updateEmptyRowsButton();
 }
 
 // ============================================
@@ -2102,8 +2106,35 @@ function getUniqueValues(field, includeEmpty = true) {
     return sorted;
 }
 
+let hideEmptyRows = false;
+try {
+    hideEmptyRows = localStorage.getItem('hideEmptyRows') === '1';
+} catch (e) { /* storage unavailable */ }
+
+function memberHasAnyData(ma) {
+    const days = attendanceData[ma];
+    if (!days) return false;
+    for (const k in days) {
+        if (days[k] && days[k] !== 'unmarked') return true;
+    }
+    return false;
+}
+
+function toggleEmptyRows() {
+    hideEmptyRows = !hideEmptyRows;
+    try { localStorage.setItem('hideEmptyRows', hideEmptyRows ? '1' : '0'); } catch (e) {}
+    updateEmptyRowsButton();
+    renderTable();
+}
+
+function updateEmptyRowsButton() {
+    const btn = document.getElementById('toggleEmptyRows');
+    if (btn) btn.textContent = hideEmptyRows ? 'הצג שורות ריקות' : 'הסתר שורות ריקות';
+}
+
 function getFilteredMembers() {
     return teamMembers.filter(member => {
+        if (hideEmptyRows && !memberHasAnyData(member.ma)) return false;
         // Check search filters (text-based, case-insensitive, partial match)
         if (searchFilters.firstName) {
             const memberValue = (member.firstName || '').toLowerCase();
