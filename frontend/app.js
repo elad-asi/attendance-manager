@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '3.4.7';  // Unit cards: avg yamam per day
+const FE_VERSION = '3.4.8';  // Unit card avg: over active days only
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -1927,14 +1927,19 @@ function renderUnitSelector() {
 
     filteredMembers.forEach(member => {
         const unit = member.mahlaka || 'ללא מחלקה';
-        const memberYamam = calculateMemberTotal(member.ma, dates, TOTALS_CONFIG.counted);
-
         if (!unitData[unit]) {
-            unitData[unit] = { count: 0, yamam: 0 };
+            unitData[unit] = { count: 0, yamam: 0, dayCounts: {} };
         }
         unitData[unit].count++;
-        unitData[unit].yamam += memberYamam;
-        grandTotalYamam += memberYamam;
+        dates.forEach(date => {
+            const dateStr = formatDate(date);
+            const status = (attendanceData[member.ma] && attendanceData[member.ma][dateStr]) || 'unmarked';
+            if (TOTALS_CONFIG.counted.includes(status)) {
+                unitData[unit].yamam++;
+                unitData[unit].dayCounts[dateStr] = (unitData[unit].dayCounts[dateStr] || 0) + 1;
+                grandTotalYamam++;
+            }
+        });
     });
 
     // Sort units alphabetically but put 'ללא מחלקה' last
@@ -1958,7 +1963,9 @@ function renderUnitSelector() {
         const isActive = activeUnitTabs.includes(unit) ? 'active' : '';
         // Escape quotes in unit name for HTML attribute safety
         const escapedUnit = unit.replace(/"/g, '&quot;');
-        const avgPerDay = dates.length ? Math.round((data.yamam / dates.length) * 10) / 10 : 0;
+        // average over days the unit actually has counted people (not empty days)
+        const activeDays = Object.keys(data.dayCounts).length;
+        const avgPerDay = activeDays ? Math.round((data.yamam / activeDays) * 10) / 10 : 0;
         html += `
             <div class="unit-card ${isActive}" data-unit="${escapedUnit}">
                 <div class="unit-card-name">${unit}</div>
