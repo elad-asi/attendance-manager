@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '3.4.6';  // Totals tooltip: per-unit breakdown
+const FE_VERSION = '3.4.7';  // Unit cards: avg yamam per day
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -1958,11 +1958,13 @@ function renderUnitSelector() {
         const isActive = activeUnitTabs.includes(unit) ? 'active' : '';
         // Escape quotes in unit name for HTML attribute safety
         const escapedUnit = unit.replace(/"/g, '&quot;');
+        const avgPerDay = dates.length ? Math.round((data.yamam / dates.length) * 10) / 10 : 0;
         html += `
             <div class="unit-card ${isActive}" data-unit="${escapedUnit}">
                 <div class="unit-card-name">${unit}</div>
                 <div class="unit-card-count">${data.count}</div>
                 <div class="unit-card-yamam">ימ"מ: ${data.yamam}</div>
+                <div class="unit-card-avg">ממוצע ליום: ${avgPerDay}</div>
             </div>
         `;
     });

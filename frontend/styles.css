@@ -857,6 +857,12 @@ header h1 {
     font-weight: bold;
 }
 
+.unit-card-avg {
+    font-size: 0.72rem;
+    color: #1a6b5a;
+    font-weight: 600;
+}
+
 .unit-card-yamam {
     font-size: 0.75rem;
     opacity: 0.8;
