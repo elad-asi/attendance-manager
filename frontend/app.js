@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '3.4.8';  // Unit card avg: over active days only
+const FE_VERSION = '3.4.9';  // Unit card avg: dorech/yamam per day
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -1928,7 +1928,7 @@ function renderUnitSelector() {
     filteredMembers.forEach(member => {
         const unit = member.mahlaka || 'ללא מחלקה';
         if (!unitData[unit]) {
-            unitData[unit] = { count: 0, yamam: 0, dayCounts: {} };
+            unitData[unit] = { count: 0, yamam: 0, dorech: 0, dayCounts: {} };
         }
         unitData[unit].count++;
         dates.forEach(date => {
@@ -1938,6 +1938,9 @@ function renderUnitSelector() {
                 unitData[unit].yamam++;
                 unitData[unit].dayCounts[dateStr] = (unitData[unit].dayCounts[dateStr] || 0) + 1;
                 grandTotalYamam++;
+            }
+            if (TOTALS_CONFIG.mission.includes(status)) {
+                unitData[unit].dorech++;
             }
         });
     });
@@ -1963,15 +1966,16 @@ function renderUnitSelector() {
         const isActive = activeUnitTabs.includes(unit) ? 'active' : '';
         // Escape quotes in unit name for HTML attribute safety
         const escapedUnit = unit.replace(/"/g, '&quot;');
-        // average over days the unit actually has counted people (not empty days)
+        // averages over days the unit actually has counted people (not empty days)
         const activeDays = Object.keys(data.dayCounts).length;
-        const avgPerDay = activeDays ? Math.round((data.yamam / activeDays) * 10) / 10 : 0;
+        const avgYamam = activeDays ? Math.round((data.yamam / activeDays) * 10) / 10 : 0;
+        const avgDorech = activeDays ? Math.round((data.dorech / activeDays) * 10) / 10 : 0;
         html += `
             <div class="unit-card ${isActive}" data-unit="${escapedUnit}">
                 <div class="unit-card-name">${unit}</div>
                 <div class="unit-card-count">${data.count}</div>
                 <div class="unit-card-yamam">ימ"מ: ${data.yamam}</div>
-                <div class="unit-card-avg">ממוצע ליום: ${avgPerDay}</div>
+                <div class="unit-card-avg" title="נוכחים בפועל / ימ&quot;מ - ממוצע יומי">ממוצע ליום: ${avgDorech}/${avgYamam}</div>
             </div>
         `;
     });
