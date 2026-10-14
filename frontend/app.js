@@ -3,7 +3,13 @@
 // ============================================
 
 // Version
-const FE_VERSION = '3.4.9';  // Unit card avg: dorech/yamam per day
+const FE_VERSION = '3.4.10';  // Placeholder MAs (9000xxx) shown as blank ID
+
+// Internal placeholder MAs (members added without a real מספר אישי) are
+// hidden in the UI and exports; the value is still the row key internally.
+function displayMa(ma) {
+    return /^90000\d{2}$/.test(ma || '') ? '' : (ma || '');
+}
 
 // Auto-polling configuration
 const POLL_INTERVAL_MS = 3000; // 3 seconds
@@ -2451,7 +2457,7 @@ function renderTable() {
             <td class="sticky-col col-index" style="right: ${colPositions.index}px">${index + 1}</td>
             <td class="sticky-col name-cell-hover" style="right: ${colPositions.firstname}px" data-ma="${member.ma}">${member.firstName || ''}</td>
             <td class="sticky-col name-cell-hover" style="right: ${colPositions.lastname}px" data-ma="${member.ma}">${member.lastName || ''}</td>
-            <td class="sticky-col" style="right: ${colPositions.ma}px">${member.ma}</td>
+            <td class="sticky-col" style="right: ${colPositions.ma}px">${displayMa(member.ma)}</td>
             <td class="sticky-col" style="right: ${colPositions.gdud}px">${member.gdud || ''}</td>
             <td class="sticky-col" style="right: ${colPositions.pluga}px">${member.pluga || ''}</td>
             ${showMahlaka ? `<td class="sticky-col" style="right: ${colPositions.mahlaka}px">${member.mahlaka || ''}</td>` : ''}
@@ -3225,7 +3231,7 @@ async function exportData() {
         const row = [
             member.firstName || '',
             member.lastName || '',
-            member.ma,
+            displayMa(member.ma),
             member.gdud || '',
             member.pluga || '',
             member.mahlaka || '',
