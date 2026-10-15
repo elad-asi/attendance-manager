@@ -3,7 +3,7 @@
 // ============================================
 
 // Version
-const FE_VERSION = '3.4.10';  // Placeholder MAs (9000xxx) shown as blank ID
+const FE_VERSION = '3.4.11';  // Export: legend rows appended
 
 // Internal placeholder MAs (members added without a real מספר אישי) are
 // hidden in the UI and exports; the value is still the row key internally.
@@ -3257,6 +3257,16 @@ async function exportData() {
         });
         exportRows.push(row);
     });
+
+    // Legend
+    exportRows.push([]);
+    exportRows.push(['מקרא:']);
+    exportRows.push(['✓', 'נוכח בבסיס']);
+    exportRows.push(['+', 'מגיע לבסיס (נוכח)']);
+    exportRows.push(['-', 'יוצא מהבסיס (נוכח)']);
+    exportRows.push(['○', 'בבית - נספר ימ"מ']);
+    exportRows.push(['ג', 'מחלה (ג\') - נספר ימ"מ']);
+    exportRows.push(['ריק', 'לא בשירות / לא נספר']);
 
     const ws = XLSX.utils.aoa_to_sheet(exportRows);
     XLSX.utils.book_append_sheet(wb, ws, 'נוכחות');
